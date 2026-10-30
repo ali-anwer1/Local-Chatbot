@@ -1,0 +1,136 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R 10 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 1302 >>
+stream
+BT
+/F2 14 Tf
+1 0 0 1 50 745 Tm (Astra NX-200 Industrial Edge Gateway - Hardware Datasheet \(Page 1\)) Tj
+/F1 10 Tf
+1 0 0 1 50 725 Tm (Part Number: AST-NX200-R2   |   Hardware Revision: Rev 2.4) Tj
+/F2 11 Tf
+1 0 0 1 50 693 Tm (1. Product Summary and Compute Architecture) Tj
+/F1 10 Tf
+1 0 0 1 50 673 Tm (The Astra NX-200 \(model AST-NX200-R2\) is a rugged, fanless DIN-rail industrial edge) Tj
+/F1 10 Tf
+1 0 0 1 50 657 Tm (gateway engineered for deterministic factory telemetry, protocol translation, and) Tj
+/F1 10 Tf
+1 0 0 1 50 641 Tm (air-gapped plant-floor data aggregation.) Tj
+/F1 10 Tf
+1 0 0 1 50 615 Tm (Processor: Quad-core ARM Cortex-A78AE industrial SoC operating at 2.2 GHz.) Tj
+/F1 10 Tf
+1 0 0 1 50 599 Tm (System Memory: 8 GB LPDDR5 with inline Error-Correcting Code \(ECC\) at 4800 MT/s.) Tj
+/F1 10 Tf
+1 0 0 1 50 583 Tm (Primary Storage: 64 GB industrial-grade pSLC eMMC 5.1 flash soldered on board.) Tj
+/F1 10 Tf
+1 0 0 1 50 567 Tm (Expansion Storage: One internal M.2 2280 Key-M PCIe Gen3 x2 NVMe slot supporting) Tj
+/F1 10 Tf
+1 0 0 1 50 551 Tm (up to 2 TB industrial NVMe SSD modules.) Tj
+/F1 10 Tf
+1 0 0 1 50 535 Tm (Security Element: Dedicated discrete Infineon OPTIGA TPM 2.0 chip supporting hardware) Tj
+/F1 10 Tf
+1 0 0 1 50 519 Tm (secure boot and cryptographic key storage.) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 1301 >>
+stream
+BT
+/F2 14 Tf
+1 0 0 1 50 745 Tm (Astra NX-200 Hardware Datasheet - Electrical & Environmental \(Page 2\)) Tj
+/F2 11 Tf
+1 0 0 1 50 709 Tm (2. Electrical Power Specifications) Tj
+/F1 10 Tf
+1 0 0 1 50 689 Tm (Input Voltage Range: Dual redundant terminal-block DC inputs rated 12 V to 48 V DC.) Tj
+/F1 10 Tf
+1 0 0 1 50 673 Tm (Power Consumption: Typical nominal power draw is 18 W; peak load with PoE+ active is 34 W.) Tj
+/F1 10 Tf
+1 0 0 1 50 657 Tm (Protection Circuitry: Integrated reverse-polarity protection up to -60 V DC and) Tj
+/F1 10 Tf
+1 0 0 1 50 641 Tm (over-voltage crowbar clamping above 54 V DC.) Tj
+/F2 11 Tf
+1 0 0 1 50 609 Tm (3. Mechanical and Environmental Ratings) Tj
+/F1 10 Tf
+1 0 0 1 50 589 Tm (Operating Temperature: -30 C to +70 C continuous ambient with vertical DIN-rail airflow.) Tj
+/F1 10 Tf
+1 0 0 1 50 573 Tm (Storage Temperature: -40 C to +85 C non-operating.) Tj
+/F1 10 Tf
+1 0 0 1 50 557 Tm (Relative Humidity: 5% to 95% non-condensing.) Tj
+/F1 10 Tf
+1 0 0 1 50 541 Tm (Enclosure Protection: IP40 black anodized extruded aluminum chassis, weight 1.15 kg.) Tj
+/F1 10 Tf
+1 0 0 1 50 525 Tm (Vibration Resistance: 5 Grms random vibration \(5 Hz to 500 Hz\) per IEC 60068-2-64.) Tj
+/F1 10 Tf
+1 0 0 1 50 509 Tm (Shock Resistance: 50 G half-sine 11 ms pulse per IEC 60068-2-27.) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+9 0 obj
+<< /Length 1234 >>
+stream
+BT
+/F2 14 Tf
+1 0 0 1 50 745 Tm (Astra NX-200 Hardware Datasheet - Network & Fieldbus I/O \(Page 3\)) Tj
+/F2 11 Tf
+1 0 0 1 50 709 Tm (4. Ethernet and Industrial Fieldbus Interfaces) Tj
+/F1 10 Tf
+1 0 0 1 50 689 Tm (Ethernet Port ETH0: 2.5GbE RJ45 uplink/management port \(10/100/1000/2500BASE-T\).) Tj
+/F1 10 Tf
+1 0 0 1 50 673 Tm (Ethernet Port ETH1: 2.5GbE RJ45 downstream sensor port featuring IEEE 802.3at PoE+) Tj
+/F1 10 Tf
+1 0 0 1 50 657 Tm (Power Sourcing Equipment \(PSE\) delivering up to 25.5 W \(requires >= 24 V DC input\).) Tj
+/F1 10 Tf
+1 0 0 1 50 631 Tm (Serial Ports COM1 & COM2: Two software-selectable RS-485 / RS-232 DB9 ports featuring) Tj
+/F1 10 Tf
+1 0 0 1 50 615 Tm (2.5 kVrms digital galvanic isolation and programmable 120-ohm line termination.) Tj
+/F1 10 Tf
+1 0 0 1 50 599 Tm (Native protocol support for Modbus RTU master/slave up to 921.6 kbps.) Tj
+/F1 10 Tf
+1 0 0 1 50 573 Tm (CAN Bus Interface: One isolated CAN-FD phoenix terminal port supporting 1 Mbps nominal) Tj
+/F1 10 Tf
+1 0 0 1 50 557 Tm (arbitration bit rate and up to 5 Mbps data-phase bit rate \(ISO 11898-1:2015\).) Tj
+/F1 10 Tf
+1 0 0 1 50 541 Tm (Digital I/O: 4 optically isolated digital inputs \(24 V wet/dry\) and 2 Form-A relay outputs.) Tj
+ET
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 9 0 R >>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000134 00000 n 
+0000000231 00000 n 
+0000000333 00000 n 
+0000001687 00000 n 
+0000001823 00000 n 
+0000003176 00000 n 
+0000003312 00000 n 
+0000004598 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R >>
+startxref
+4735
+%%EOF

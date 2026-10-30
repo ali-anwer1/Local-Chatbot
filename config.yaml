@@ -1,0 +1,11 @@
+# Local RAG Chatbot Configuration
+# Note: host must remain 127.0.0.1 — network exposure is strictly disabled.
+host: "127.0.0.1"
+port: 8000
+data_dir: "data"
+
+ollama_base_url: "http://127.0.0.1:11434"
+default_chat_model: "qwen3.5:4b"
+default_embedding_model: "nomic-embed-text"
+allow_chat_fallback: true
+model_cache_ttl_seconds: 30

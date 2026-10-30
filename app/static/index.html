@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>Local RAG Chatbot</title>
+  <link rel="stylesheet" href="/static/styles.css?v=1.1.1">
+</head>
+<body>
+  <!-- Global Ollama Unreachable Banner (§4.7 row 1) -->
+  <div id="global-ollama-banner" class="system-banner danger" role="alert" hidden>
+    <div class="banner-content">
+      <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+      </svg>
+      <span id="global-ollama-banner-text">Ollama is not reachable. Start Ollama and click Retry.</span>
+    </div>
+    <button type="button" id="btn-retry-ollama" class="btn small">Retry</button>
+  </div>
+
+  <!-- Right- panel closed by default (.settings-collapsed); left sidebar open by default -->
+  <div class="app-layout settings-collapsed">
+    <!-- Left Sidebar: Profiles, Saved Chats & Status -->
+    <aside id="left-sidebar" class="sidebar" aria-label="Profiles and saved chats">
+      <header class="sidebar-header">
+        <div class="sidebar-top-row">
+          <div class="brand-row">
+            <div class="brand-mark" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2a.75.75 0 01.67.415l1.882 3.765 4.155.604a.75.75 0 01.416 1.279l-3.007 2.93.71 4.139a.75.75 0 01-1.088.791L10 13.97l-3.738 1.953a.75.75 0 01-1.088-.79l.71-4.14-3.007-2.93a.75.75 0 01.416-1.28l4.155-.603L9.33 2.415A.75.75 0 0110 2z"/>
+              </svg>
+            </div>
+            <div>
+              <h1>Local RAG</h1>
+              <p class="brand-subtitle">Private Knowledge AI</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            id="btn-close-left-sidebar"
+            class="icon-btn"
+            title="Close sidebar"
+            aria-label="Close left sidebar"
+            aria-expanded="true"
+            aria-controls="left-sidebar"
+          >
+            <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
+              <rect x="2.75" y="3.5" width="14.5" height="13" rx="2.25"/>
+              <line x1="7.5" y1="3.5" x2="7.5" y2="16.5"/>
+              <path d="M12.75 8l-2 2 2 2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <button type="button" id="btn-sidebar-new-chat" class="btn new-chat-btn full-width">
+          <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/>
+          </svg>
+          <span>New Chat</span>
+        </button>
+      </header>
+
+      <div class="sidebar-scroll">
+        <!-- Bot Profiles Section -->
+        <nav class="sidebar-section" aria-label="Bot profiles">
+          <div class="sidebar-section-header">
+            <h2 class="section-eyebrow">Bot Profiles</h2>
+            <button
+              type="button"
+              id="btn-new-profile"
+              class="icon-btn tiny"
+              title="Create new bot profile"
+              aria-label="Create new bot profile"
+            >
+              <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/>
+              </svg>
+            </button>
+          </div>
+          <ul id="profile-list" class="profile-list"></ul>
+        </nav>
+
+        <!-- Saved Chats Section (scoped to active profile) -->
+        <nav id="saved-chats-section" class="sidebar-section" aria-label="Saved chats">
+          <div class="sidebar-section-header">
+            <h2 class="section-eyebrow">Saved Chats</h2>
+            <span id="saved-chats-count" class="eyebrow-count">0</span>
+          </div>
+          <ul id="saved-chat-list" class="saved-chat-list"></ul>
+        </nav>
+      </div>
+
+      <footer class="sidebar-footer">
+        <div id="ollama-status-pill" class="status-pill checking" role="status" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="ollama-status-text">Checking Ollama…</span>
+        </div>
+        <button type="button" id="btn-open-pull-modal" class="btn subtle small full-width">
+          <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/>
+            <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/>
+          </svg>
+          <span>Download Model…</span>
+        </button>
+      </footer>
+    </aside>
+
+    <!-- Center: Main Chat Stage -->
+    <main class="chat-panel">
+      <!-- Fallback Open-Sidebar button when chat-workspace is hidden and left sidebar is collapsed -->
+      <div id="empty-stage-topbar" class="empty-stage-topbar" hidden>
+        <button
+          type="button"
+          id="btn-open-left-sidebar-alt"
+          class="icon-btn"
+          title="Open sidebar"
+          aria-label="Open left sidebar"
+        >
+          <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
+            <rect x="2.75" y="3.5" width="14.5" height="13" rx="2.25"/>
+            <line x1="7.5" y1="3.5" x2="7.5" y2="16.5"/>
+            <path d="M10.75 8l2 2-2 2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- First-Run Screen when 0 models are installed (§4.7 row 2) -->
+      <section id="first-run-screen" class="first-run-card" hidden>
+        <div class="first-run-inner">
+          <h2>First-Time Model Setup Required</h2>
+          <p>Ollama is running locally, but no models are installed yet. Run these commands in a terminal (or download directly below), then click <strong>Retry</strong>:</p>
+          <div id="recommended-commands-list" class="command-list"></div>
+          <div class="first-run-actions">
+            <button type="button" id="btn-first-run-retry" class="btn primary">Retry Model Check</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Empty State when no profiles exist yet -->
+      <section id="no-profile-screen" class="empty-workspace" hidden>
+        <div class="empty-card">
+          <div class="welcome-orb" aria-hidden="true">
+            <svg class="icon-lg" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2.25a.75.75 0 01.67.415l2.29 4.582 5.057.735a.75.75 0 01.416 1.279l-3.66 3.567.864 5.037a.75.75 0 01-1.088.791L12 16.277l-4.549 2.379a.75.75 0 01-1.088-.79l.864-5.038-3.66-3.567a.75.75 0 01.416-1.28l5.057-.734 2.29-4.582A.75.75 0 0112 2.25z"/>
+            </svg>
+          </div>
+          <h2>Create Your First Bot Profile</h2>
+          <p>Each bot profile pairs a custom persona with its own isolated local knowledge base (PDF, DOCX, Markdown, TXT) running 100% on your machine.</p>
+          <button type="button" id="btn-empty-new-profile" class="btn primary">Create Bot Profile</button>
+        </div>
+      </section>
+
+      <!-- Active Profile Chat Workspace -->
+      <div id="chat-workspace" class="chat-workspace" hidden>
+        <header class="chat-header">
+          <div class="chat-header-start">
+            <button
+              type="button"
+              id="btn-open-left-sidebar"
+              class="icon-btn"
+              title="Open sidebar"
+              aria-label="Open left sidebar"
+              hidden
+            >
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
+                <rect x="2.75" y="3.5" width="14.5" height="13" rx="2.25"/>
+                <line x1="7.5" y1="3.5" x2="7.5" y2="16.5"/>
+                <path d="M10.75 8l2 2-2 2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              id="btn-header-new-chat"
+              class="icon-btn"
+              title="New chat"
+              aria-label="Start new chat"
+              hidden
+            >
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                <path d="M10 4.5v11M4.5 10h11" stroke-linecap="round"/>
+              </svg>
+            </button>
+
+            <div class="chat-title-group">
+              <div class="title-line">
+                <h2 id="active-profile-title">Profile</h2>
+                <span id="active-chat-badge" class="saved-indicator" hidden>Saved</span>
+              </div>
+              <div class="chat-meta-pills">
+                <span id="active-model-badge" class="meta-chip" aria-live="polite">Model: —</span>
+                <button
+                  type="button"
+                  id="btn-kb-pill"
+                  class="meta-chip clickable"
+                  title="View uploaded knowledge base documents"
+                >
+                  <span id="active-kb-badge">0 docs · 0 chunks</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-toolbar">
+            <button
+              type="button"
+              id="btn-save-chat"
+              class="btn subtle small"
+              title="Save conversation to this profile"
+              disabled
+            >
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
+                <path d="M5.5 3.5h9a1.5 1.5 0 011.5 1.5v11.5l-6-3.25-6 3.25V5a1.5 1.5 0 011.5-1.5z" stroke-linejoin="round"/>
+              </svg>
+              <span id="btn-save-chat-label">Save Chat</span>
+            </button>
+
+            <button
+              type="button"
+              id="btn-export-chat"
+              class="btn subtle small"
+              title="Export conversation as Markdown (.md)"
+              disabled
+            >
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
+                <path d="M10 3.5v8.5m0 0l-3-3m3 3l3-3M4 13.5v1.75A1.25 1.25 0 005.25 16.5h9.5A1.25 1.25 0 0016 15.25V13.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>Export</span>
+            </button>
+
+            <button
+              type="button"
+              id="btn-clear-chat"
+              class="btn subtle small"
+              title="Start a fresh conversation"
+            >
+              New Chat
+            </button>
+
+            <label class="toggle-control" for="toggle-debug" title="Show similarity scores and candidate chunks">
+              <input type="checkbox" id="toggle-debug">
+              <span>Debug</span>
+            </label>
+
+            <button
+              type="button"
+              id="btn-toggle-settings"
+              class="icon-btn settings-trigger"
+              title="Settings &amp; Knowledge Base"
+              aria-label="Toggle Settings and Knowledge Base panel"
+              aria-expanded="false"
+              aria-controls="settings-panel"
+            >
+              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
+                <line x1="3" y1="5.5" x2="17" y2="5.5" stroke-linecap="round"/>
+                <circle cx="7" cy="5.5" r="2" fill="var(--bg-surface)"/>
+                <line x1="3" y1="10" x2="17" y2="10" stroke-linecap="round"/>
+                <circle cx="13" cy="10" r="2" fill="var(--bg-surface)"/>
+                <line x1="3" y1="14.5" x2="17" y2="14.5" stroke-linecap="round"/>
+                <circle cx="8.5" cy="14.5" r="2" fill="var(--bg-surface)"/>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <!-- Profile-specific §4.7 Banners (Fallback / Missing Chat Model / Missing Embed Model / Metadata Mismatch) -->
+        <div id="profile-banners" class="profile-banners" aria-live="polite"></div>
+
+        <!-- Centered Message Stream -->
+        <div id="chat-messages" class="chat-messages" role="log" aria-label="Conversation">
+          <div id="chat-welcome" class="chat-welcome">
+            <div class="welcome-orb" aria-hidden="true">
+              <svg class="icon-lg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2.25a.75.75 0 01.67.415l2.29 4.582 5.057.735a.75.75 0 01.416 1.279l-3.66 3.567.864 5.037a.75.75 0 01-1.088.791L12 16.277l-4.549 2.379a.75.75 0 01-1.088-.79l.864-5.038-3.66-3.567a.75.75 0 01.416-1.28l5.057-.734 2.29-4.582A.75.75 0 0112 2.25z"/>
+              </svg>
+            </div>
+            <h3 id="welcome-heading">How can I help with your documents?</h3>
+            <p class="welcome-subtext">Grounded strictly in this profile's local knowledge base with inline citations.</p>
+            <div class="starter-chips" aria-label="Suggested prompts">
+              <button type="button" class="starter-chip" data-prompt="What can you help me with?">
+                What can you help me with?
+              </button>
+              <button type="button" class="starter-chip" data-prompt="What documents and topics are in your knowledge base?">
+                What documents are in your knowledge base?
+              </button>
+              <button type="button" class="starter-chip" data-prompt="Give me a concise overview of the key specifications or procedures.">
+                Summarize key specifications &amp; procedures
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating Rounded Pill Composer -->
+        <div class="composer-shell">
+          <form id="chat-form" class="chat-composer">
+            <label for="chat-input" class="visually-hidden">Ask a question about this profile's documents</label>
+            <textarea
+              id="chat-input"
+              rows="1"
+              placeholder="Ask anything about your documents…"
+            ></textarea>
+
+            <div class="composer-toolbar">
+              <div class="composer-tools-left">
+                <button
+                  type="button"
+                  id="btn-thinking-toggle"
+                  class="thinking-pill"
+                  aria-pressed="false"
+                  title="Thinking mode is disabled by default for faster responses. Click to toggle model reasoning."
+                >
+                  <svg class="icon-sm" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M10 2a6 6 0 00-3.815 10.631C7.237 13.5 8 14.443 8 15.456v.044a.75.75 0 00.75.75h2.5a.75.75 0 00.75-.75v-.044c0-1.013.762-1.957 1.815-2.825A6 6 0 0010 2zM8.25 17.5a.75.75 0 000 1.5h3.5a.75.75 0 000-1.5h-3.5z"/>
+                  </svg>
+                  <span id="thinking-pill-label">Thinking: Off</span>
+                </button>
+                <span class="composer-hint">Enter to send · Shift+Enter for new line</span>
+              </div>
+
+              <div class="composer-actions">
+                <button type="button" id="btn-stop-stream" class="send-circle-btn stop" title="Stop generating" aria-label="Stop generating" hidden>
+                  <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/>
+                  </svg>
+                </button>
+                <button type="submit" id="btn-send-chat" class="send-circle-btn" title="Send message" aria-label="Send message">
+                  <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M10 16.25a.75.75 0 01-.75-.75V6.31L5.78 9.78a.75.75 0 01-1.06-1.06l4.75-4.75a.75.75 0 011.06 0l4.75 4.75a.75.75 0 11-1.06 1.06L10.75 6.31v9.19a.75.75 0 01-.75.75z" clip-rule="evenodd"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right Drawer: Profile Settings & Compact Knowledge Base Overview -->
+    <aside id="settings-panel" class="settings-panel" aria-label="Profile settings and knowledge base">
+      <header class="drawer-header">
+        <div>
+          <h2>Settings &amp; Knowledge</h2>
+          <p class="drawer-subtitle">Configure persona, retrieval &amp; files</p>
+        </div>
+        <button
+          type="button"
+          id="btn-close-settings"
+          class="icon-btn"
+          title="Close panel"
+          aria-label="Close Settings and Knowledge Base panel"
+        >
+          <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M5.5 5.5l9 9m0-9l-9 9" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </header>
+
+      <div id="settings-content" class="drawer-scroll" hidden>
+        <!-- Uncluttered Knowledge Base Summary Section -->
+        <section class="panel-section">
+          <div class="section-header-row">
+            <h3>Knowledge Base</h3>
+            <span id="docs-summary-badge" class="count-pill">0 files</span>
+          </div>
+
+          <div class="kb-summary-card">
+            <div class="kb-stats-row">
+              <div>
+                <div id="kb-card-headline" class="kb-card-headline">0 Indexed Documents</div>
+                <div id="kb-card-subline" class="kb-card-subline">0 vector chunks · PDF, DOCX, MD, TXT</div>
+              </div>
+              <span id="kb-warning-pill" class="warn-badge" hidden>Warning</span>
+            </div>
+
+            <!-- Compact preview of at most 3 recent documents so sidebar never gets crowded -->
+            <ul id="document-preview-list" class="doc-preview-list" hidden></ul>
+
+            <div class="kb-card-actions">
+              <label for="file-upload-input" id="file-upload-label" class="btn secondary small upload-trigger">
+                <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M9.25 13.25a.75.75 0 001.5 0V4.636l2.955 3.129a.75.75 0 001.09-1.03l-4.25-4.5a.75.75 0 00-1.09 0l-4.25 4.5a.75.75 0 101.09 1.03L9.25 4.636v8.614z"/>
+                  <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/>
+                </svg>
+                <span>Upload Files…</span>
+              </label>
+              <input
+                type="file"
+                id="file-upload-input"
+                accept=".pdf,.docx,.txt,.md"
+                multiple
+                class="visually-hidden"
+              >
+
+              <button type="button" id="btn-open-docs-modal" class="btn subtle small">
+                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
+                  <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" stroke-linecap="round"/>
+                </svg>
+                <span id="btn-open-docs-label">View All Files</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="upload-status-msg" class="status-feedback" role="status" aria-live="polite" hidden></div>
+        </section>
+
+        <!-- Bot Configuration Section -->
+        <section class="panel-section">
+          <h3>Profile Settings</h3>
+          <form id="profile-settings-form" class="settings-form">
+            <div class="field-group">
+              <label for="setting-name">Display Name</label>
+              <input type="text" id="setting-name" required maxlength="80">
+            </div>
+
+            <div class="field-group">
+              <label for="setting-preamble">System Preamble</label>
+              <textarea id="setting-preamble" rows="4" placeholder="Persona, tone, domain context…"></textarea>
+              <details class="grounding-notice">
+                <summary>View fixed grounding rules (always appended)</summary>
+                <p>Answer only using the numbered context passages. Cite passages as [n]. If the passages do not contain the answer, reply exactly with the refusal message and briefly state what information is missing. Do not use outside knowledge.</p>
+              </details>
+            </div>
+
+            <div class="field-group">
+              <label for="setting-chat-model">Chat Model (Completion)</label>
+              <select id="setting-chat-model"></select>
+            </div>
+
+            <div class="field-group">
+              <label class="checkbox-row" for="setting-thinking">
+                <input type="checkbox" id="setting-thinking">
+                <span>
+                  <strong>Enable Thinking Mode by default</strong>
+                  <small class="field-hint block">Off by default for faster answers. Enable only when deep multi-step reasoning is needed.</small>
+                </span>
+              </label>
+            </div>
+
+            <div class="field-group">
+              <label for="setting-embedding-model">Embedding Model</label>
+              <select id="setting-embedding-model"></select>
+              <span class="field-hint">Changing embedding model triggers a full re-index after confirmation.</span>
+            </div>
+
+            <div class="field-group">
+              <div class="label-with-value">
+                <label for="setting-threshold">Refusal Similarity Threshold</label>
+                <output id="setting-threshold-out" for="setting-threshold">0.50</output>
+              </div>
+              <input type="range" id="setting-threshold" min="0" max="1" step="0.01" value="0.50">
+              <span class="field-hint">Factual queries scoring below this cutoff are refused in code before calling the LLM.</span>
+            </div>
+
+            <div class="field-grid-2">
+              <div class="field-group">
+                <label for="setting-temperature">Temperature</label>
+                <input type="number" id="setting-temperature" min="0" max="2" step="0.05" value="0.2">
+              </div>
+              <div class="field-group">
+                <label for="setting-topk">Top-K Chunks</label>
+                <input type="number" id="setting-topk" min="1" max="25" step="1" value="5">
+              </div>
+            </div>
+
+            <div class="field-grid-2">
+              <div class="field-group">
+                <label for="setting-chunk-size">Chunk Size (chars)</label>
+                <input type="number" id="setting-chunk-size" min="100" max="8000" step="50" value="1000">
+              </div>
+              <div class="field-group">
+                <label for="setting-chunk-overlap">Overlap (chars)</label>
+                <input type="number" id="setting-chunk-overlap" min="0" max="4000" step="25" value="150">
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label for="setting-history-turns">Conversation History Turns</label>
+              <input type="number" id="setting-history-turns" min="0" max="20" step="1" value="4">
+            </div>
+
+            <div class="field-group">
+              <label for="setting-refusal-msg">Refusal Message</label>
+              <input type="text" id="setting-refusal-msg" maxlength="240">
+            </div>
+
+            <!-- Auto-dismissing toast banner for immediate save feedback -->
+            <div id="settings-save-feedback" class="status-feedback" role="status" aria-live="polite" hidden></div>
+
+            <div class="settings-actions">
+              <button type="submit" id="btn-save-settings" class="btn primary full-width">Save Settings</button>
+            </div>
+
+            <!-- Persistent Latest Save Timestamp & Change History (#8) -->
+            <div id="settings-history-box" class="settings-history-box"></div>
+
+            <div class="danger-zone">
+              <button type="button" id="btn-delete-profile" class="btn danger-outline small full-width">Delete Profile</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Modal 1: Create New Profile -->
+  <dialog id="dialog-new-profile" class="modal-dialog">
+    <form id="form-new-profile" method="dialog" class="modal-body">
+      <div class="modal-header-row">
+        <h2>Create Bot Profile</h2>
+        <button type="button" id="btn-close-new-profile-x" class="icon-btn tiny" aria-label="Close">✕</button>
+      </div>
+      <div class="field-group">
+        <label for="new-profile-name">Profile Name</label>
+        <input type="text" id="new-profile-name" placeholder="e.g. Astra NX-200 Spec Assistant" required maxlength="80">
+      </div>
+      <div class="field-group">
+        <label for="new-profile-preamble">System Preamble</label>
+        <textarea id="new-profile-preamble" rows="4" placeholder="You are an internal technical assistant answering questions about the Astra NX-200 product specification, maintenance SOPs, and warranty terms. Be concise and precise."></textarea>
+      </div>
+      <div class="field-grid-2">
+        <div class="field-group">
+          <label for="new-profile-chat-model">Chat Model</label>
+          <select id="new-profile-chat-model"></select>
+        </div>
+        <div class="field-group">
+          <label for="new-profile-embed-model">Embedding Model</label>
+          <select id="new-profile-embed-model"></select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="btn-cancel-new-profile" class="btn subtle">Cancel</button>
+        <button type="submit" class="btn primary">Create Profile</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal 2: Embedding Model Re-index Confirmation (§4.5, §7.10) -->
+  <dialog id="dialog-confirm-reindex" class="modal-dialog">
+    <div class="modal-body">
+      <h2>Confirm Knowledge Base Re-index</h2>
+      <p id="reindex-confirm-message">Changing the embedding model will re-index all documents in this profile.</p>
+      <div class="modal-actions">
+        <button type="button" id="btn-cancel-reindex" class="btn subtle">Cancel</button>
+        <button type="button" id="btn-confirm-reindex" class="btn primary">Confirm &amp; Re-index</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Modal 3: Citation Source Chunk Inspector (§4.5) -->
+  <dialog id="dialog-citation" class="modal-dialog wide" closedby="any">
+    <div class="modal-body">
+      <div class="modal-header-row">
+        <h2 id="citation-modal-title">Source Passage</h2>
+        <span id="citation-modal-score" class="score-pill">Score: —</span>
+      </div>
+      <p id="citation-modal-meta" class="citation-provenance"></p>
+      <blockquote id="citation-modal-text" class="citation-excerpt"></blockquote>
+      <div class="modal-actions">
+        <form method="dialog">
+          <button type="submit" class="btn primary">Close</button>
+        </form>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Modal 4: User-Initiated Model Download with Confirmation, Progress & Cancel (§4.7) -->
+  <dialog id="dialog-pull-model" class="modal-dialog">
+    <div class="modal-body">
+      <div class="modal-header-row">
+        <h2>Download Ollama Model</h2>
+        <button type="button" id="btn-close-pull-x" class="icon-btn tiny" aria-label="Close">✕</button>
+      </div>
+      <p class="helper-text">Downloads connect to the Ollama model registry and require internet access. All inference and indexing run 100% offline afterwards.</p>
+
+      <div id="pull-step-input">
+        <div class="field-group">
+          <label for="pull-model-name">Model Tag</label>
+          <input type="text" id="pull-model-name" placeholder="e.g. qwen3.5:4b or nomic-embed-text">
+          <span id="pull-size-estimate" class="field-hint">Approximate size will be confirmed before downloading.</span>
+        </div>
+        <div id="pull-confirm-box" class="confirm-callout" hidden>
+          <p id="pull-confirm-text"></p>
+        </div>
+      </div>
+
+      <div id="pull-step-progress" class="pull-progress-area" hidden>
+        <div class="label-with-value">
+          <span id="pull-status-label">Starting download…</span>
+          <span id="pull-percent-label">0%</span>
+        </div>
+        <progress id="pull-progress-bar" max="100" value="0"></progress>
+      </div>
+
+      <div id="pull-error-box" class="error-callout" hidden>
+        <p id="pull-error-msg"></p>
+        <details id="pull-error-details-wrap" hidden>
+          <summary>Details</summary>
+          <pre tabindex="0"><code id="pull-error-details"></code></pre>
+        </details>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="btn-cancel-pull" class="btn subtle">Close</button>
+        <button type="button" id="btn-step-confirm-pull" class="btn secondary">Review Download</button>
+        <button type="button" id="btn-start-pull" class="btn primary" hidden>Confirm &amp; Download</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Modal 5: Organized Knowledge Base Document Manager (#7) -->
+  <dialog id="dialog-manage-docs" class="modal-dialog xwide" closedby="any">
+    <div class="modal-body">
+      <div class="modal-header-row">
+        <div>
+          <h2 id="docs-modal-title">Knowledge Base Documents</h2>
+          <p id="docs-modal-subtitle" class="helper-text">0 documents · 0 indexed chunks</p>
+        </div>
+        <div class="modal-header-actions">
+          <label for="modal-file-upload-input" id="modal-file-upload-label" class="btn secondary small upload-trigger">
+            <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/>
+            </svg>
+            <span>Upload Files…</span>
+          </label>
+          <input
+            type="file"
+            id="modal-file-upload-input"
+            accept=".pdf,.docx,.txt,.md"
+            multiple
+            class="visually-hidden"
+          >
+          <button type="button" id="btn-close-docs-modal" class="icon-btn" aria-label="Close document manager">✕</button>
+        </div>
+      </div>
+
+      <div class="docs-toolbar-row">
+        <input
+          type="search"
+          id="docs-search-input"
+          class="docs-search-input"
+          placeholder="Search documents by filename…"
+          aria-label="Search documents by filename"
+        >
+        <div class="filter-pills" role="group" aria-label="Filter documents">
+          <button type="button" class="filter-pill active" data-doc-filter="all">All</button>
+          <button type="button" class="filter-pill" data-doc-filter="indexed">Indexed</button>
+          <button type="button" class="filter-pill" data-doc-filter="warnings">Warnings</button>
+        </div>
+      </div>
+
+      <div id="modal-upload-status" class="status-feedback" role="status" aria-live="polite" hidden></div>
+
+      <div class="docs-table-scroll">
+        <ul id="modal-document-list" class="modal-document-list"></ul>
+      </div>
+
+      <div class="modal-actions">
+        <form method="dialog">
+          <button type="submit" class="btn primary">Done</button>
+        </form>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Modal 6: Save Conversation (#10) -->
+  <dialog id="dialog-save-chat" class="modal-dialog" closedby="any">
+    <form id="form-save-chat" method="dialog" class="modal-body">
+      <div class="modal-header-row">
+        <h2>Save Conversation</h2>
+        <button type="button" id="btn-close-save-chat-x" class="icon-btn tiny" aria-label="Close">✕</button>
+      </div>
+      <p class="helper-text">Saved chats are stored locally on your machine under this profile so you can reopen or continue them anytime.</p>
+      <div class="field-group">
+        <label for="save-chat-title">Conversation Title</label>
+        <input type="text" id="save-chat-title" required maxlength="120" placeholder="e.g. NX-200 Thermal Limits &amp; Maintenance">
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="btn-cancel-save-chat" class="btn subtle">Cancel</button>
+        <button type="submit" class="btn primary">Save Chat</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="/static/js/main.js?v=1.2.0"></script>
+</body>
+</html>

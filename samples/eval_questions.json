@@ -1,0 +1,126 @@
+{
+  "profile": {
+    "name": "Astra NX-200 Technical Assistant",
+    "preamble": "You are an internal hardware engineering and field-support assistant for the Astra NX-200 Industrial Edge Gateway. Provide accurate, concise technical answers strictly from the provided documentation and always cite your source passages."
+  },
+  "questions": [
+    {
+      "id": "in_01",
+      "category": "in_scope",
+      "question": "What processor, RAM, and onboard flash storage come standard in the Astra NX-200?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_datasheet.pdf",
+      "expected_page": 1,
+      "expected_keywords": ["Cortex-A78AE", "8 GB", "64 GB"]
+    },
+    {
+      "id": "in_02",
+      "category": "in_scope",
+      "question": "What is the acceptable DC input voltage range and peak power consumption of the NX-200?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_datasheet.pdf",
+      "expected_page": 2,
+      "expected_keywords": ["12 V", "48 V", "34 W"]
+    },
+    {
+      "id": "in_03",
+      "category": "in_scope",
+      "question": "How much PoE+ power can port ETH1 supply, and what galvanic isolation rating do the serial ports have?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_datasheet.pdf",
+      "expected_page": 3,
+      "expected_keywords": ["25.5 W", "2.5 kVrms"]
+    },
+    {
+      "id": "in_04",
+      "category": "in_scope",
+      "question": "How often must the RTC backup battery be replaced during preventive maintenance, and which battery model is specified?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_maintenance_sop.docx",
+      "expected_keywords": ["36", "CR2032W"]
+    },
+    {
+      "id": "in_05",
+      "category": "in_scope",
+      "question": "What spare kit, pad thickness, and M3 fastener torque are required when replacing the thermal interface pad?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_maintenance_sop.docx",
+      "expected_keywords": ["AST-TPAD-15", "1.5 mm", "0.65"]
+    },
+    {
+      "id": "in_06",
+      "category": "in_scope",
+      "question": "How do I enter Firmware Recovery Mode on the NX-200, and what static IP and port is the recovery console on?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_maintenance_sop.docx",
+      "expected_keywords": ["7 seconds", "192.168.200.1", "8443"]
+    },
+    {
+      "id": "in_07",
+      "category": "in_scope",
+      "question": "How long is the standard hardware warranty, and how long does AstraCare Plus extend coverage?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_warranty_and_sla.md",
+      "expected_keywords": ["36", "60"]
+    },
+    {
+      "id": "in_08",
+      "category": "in_scope",
+      "question": "What is the P1 engineering response time SLA, and within how many days must a defective RMA unit be returned?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_warranty_and_sla.md",
+      "expected_keywords": ["2 hours", "14"]
+    },
+    {
+      "id": "in_09",
+      "category": "in_scope",
+      "question": "What does an alternating red and amber STAT LED blink pattern mean on the Astra NX-200?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_field_faq.txt",
+      "expected_keywords": ["TPM", "E-409"]
+    },
+    {
+      "id": "in_10",
+      "category": "in_scope",
+      "question": "How much vertical airflow clearance is required above and below the NX-200 heatsink on a DIN rail?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_field_faq.txt",
+      "expected_keywords": ["35 mm"]
+    },
+    {
+      "id": "out_01",
+      "category": "out_of_scope",
+      "question": "What is the capital city of France and its current population?",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_02",
+      "category": "out_of_scope",
+      "question": "Write a Python function that implements the quicksort algorithm.",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_03",
+      "category": "out_of_scope",
+      "question": "How many days of paid annual vacation leave do full-time employees receive under HR policy?",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_04",
+      "category": "out_of_scope",
+      "question": "What is the recipe and baking temperature for sourdough artisan bread?",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_05",
+      "category": "out_of_scope",
+      "question": "What is the stock ticker symbol and Q3 revenue of NVIDIA?",
+      "expected_refusal": true,
+      "expected_keywords": []
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+ASTRA NX-200 INDUSTRIAL EDGE GATEWAY — FIELD QUICK-REFERENCE FAQ
+Document ID: FAQ-NX200-REV4
+
+Q1: What is the default local web administration URL and login credential?
+A1: Connect directly to ETH0 (factory management IP https://192.168.100.1:443). The default username is "admin". There is no shared default password; each gateway uses a unique 16-character initial password laser-etched on the right-side chassis label under the "INIT-PWD" field. Administrators are forced to rotate this password on first login.
+
+Q2: What do the front-panel STAT LED diagnostic blink patterns indicate?
+A2:
+- Solid Green: Normal operating state; all watchdog checks healthy.
+- Flashing Amber (2 Hz): Unit is booted into Firmware Recovery Mode (triggered via the RECOV button).
+- Alternating Red and Amber: Hardware TPM 2.0 attestation failure (Fault Code E-409). Do not power-cycle repeatedly; export diagnostic logs over serial COM1 at 115200 8N1 and open a P2 support ticket.
+- Solid Red: Automatic over-temperature thermal shutdown engaged because the SoC junction temperature reached 98 C. Verify ambient cabinet temperature and heatsink clearance before restarting.
+
+Q3: How much physical clearance is required around the DIN-rail enclosure?
+A3: Maintain a minimum of 35 mm vertical airflow clearance both above and below the top and bottom finned aluminum heatsink surfaces, and at least 15 mm lateral clearance from adjacent high-heat contactors or power supplies. Mounting the NX-200 horizontally (fins horizontal) derates the maximum ambient temperature from +70 C down to +55 C.
+
+Q4: Does the Astra NX-200 require cloud connectivity to operate?
+A4: No. The Astra NX-200 is engineered for air-gapped industrial networks. All Modbus RTU polling, CAN-FD telemetry bridging, local rule execution, and HTTPS administration operate 100% offline on the local plant LAN.
