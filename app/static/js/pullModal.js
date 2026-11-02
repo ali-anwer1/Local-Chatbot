@@ -53,7 +53,7 @@ export async function executeModelPull() {
   el.pullProgressBar.value = 0;
   el.pullStatusLabel.textContent = `Connecting to download ${tag}…`;
   el.pullPercentLabel.textContent = "0%";
-  el.btnCancelPull.textContent = "Cancel Download";
+  el.btnCancelPull.textContent = "Cancel download";
 
   let succeeded = false;
 

@@ -5,11 +5,18 @@ from __future__ import annotations
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass, field
 import re
+import time
 from typing import Any
 
 from app.core.availability import ModelAvailabilityManager
 from app.core.backends.base import LLMBackend
 from app.core.errors import ValidationError
+from app.core.languages import (
+    DEFAULT_REFUSAL_MESSAGES,
+    LANGUAGE_BY_CODE,
+    LanguageResolution,
+    resolve_target_language,
+)
 from app.core.profiles import Profile
 from app.core.vectorstore import RetrievedChunk, VectorStore
 
@@ -29,7 +36,9 @@ CONVERSATIONAL_GROUNDING_RULES = (
 )
 
 FOLLOWUP_PRONOUN_PATTERN = re.compile(
-    r"\b(it|its|they|them|their|theirs|this|that|these|those|he|him|his|she|her|hers|there|same|former|latter)\b",
+    r"(?:\b(it|its|they|them|their|theirs|this|that|these|those|he|him|his|she|her|hers|there|same|former|latter|"
+    r"ia|dia|mereka|ini|itu|tersebut|berkenaan|\w+nya)\b|"
+    r"[它牠祂他她][们們]?|[这這那][个個些]|[其该該])",
     re.IGNORECASE,
 )
 
@@ -42,13 +51,18 @@ PURE_GREETING_PATTERN = re.compile(
     r"thanks?(?:\s+a\s+lot|\s+so\s+much|\s+very\s+much)?|"
     r"thank\s+you(?:\s+so\s+much|\s+very\s+much|\s+a\s+lot)?|"
     r"(?:many\s+)?thanks|appreciate\s+it|great\s+thanks|awesome\s+thanks|"
-    r"bye|goodbye|see\s+you(?:\s+later)?|have\s+a\s+(?:good|great)\s+day"
+    r"bye|goodbye|see\s+you(?:\s+later)?|have\s+a\s+(?:good|great)\s+day|"
+    r"hai+|helo+|salam|assalam(?:ualaikum)?|"
+    r"selamat\s+(?:pagi|petang|tengah\s+hari|malam|sejahtera|tinggal|jalan)|"
+    r"terima\s+kasih(?:\s+banyak)?|makasih|tq|apa\s+khabar|"
+    r"你好|您好|早安|早上好|下午好|晚上好|嗨|哈啰|哈喽|"
+    r"谢谢|多谢|感谢|非常感谢|十分感谢|再见|拜拜|明天见"
     r")[!.,?\s]*$",
     re.IGNORECASE,
 )
 
 CAPABILITY_QUERY_PATTERN = re.compile(
-    r"^(?:(?:hi|hello|hey)[,!.\s]+)?(?:"
+    r"^(?:(?:hi|hello|hey|hai|helo|你好)[,!.\s]+)?(?:"
     r"what\s+can\s+you\s+(?:help(?:\s+me)?(?:\s+with)?|do|answer|assist(?:\s+me)?(?:\s+with)?)|"
     r"how\s+can\s+you\s+(?:help|assist)(?:\s+me)?|"
     r"who\s+are\s+you|what\s+are\s+you|tell\s+me\s+about\s+yourself|introduce\s+yourself|"
@@ -60,7 +74,20 @@ CAPABILITY_QUERY_PATTERN = re.compile(
     r"what(?:'s|\s+is)\s+in\s+(?:your|the|this)\s+knowledge\s*base|"
     r"what\s+(?:kind\s+of\s+)?questions?\s+can\s+i\s+ask(?:\s+you)?|"
     r"what\s+can\s+i\s+ask(?:\s+you)?(?:\s+about)?|"
-    r"help|help\s+me"
+    r"help|help\s+me|"
+    r"apa\s+(?:yang\s+)?(?:(?:boleh|dapat)\s+(?:awak|anda|kamu)|(?:awak|anda|kamu)\s+(?:boleh|dapat))\s+(?:bantu|tolong|buat|jawab)|"
+    r"bagaimana\s+(?:awak|anda|kamu)\s+(?:boleh\s+)?(?:bantu|tolong)(?:\s+saya)?|"
+    r"siapa\s+(?:awak|anda|kamu)|"
+    r"apa\s+peranan\s+(?:awak|anda|kamu)|"
+    r"apa\s+(?:dokumen|fail|topik)\s+yang\s+(?:ada|dimuat\s+naik|tersedia)|"
+    r"bantuan|tolong(?:\s+saya)?|"
+    r"(?:你能|你可以|您能|您可以)(?:帮我|为我)?(?:做什么|做些什么|干什么)|"
+    r"你能帮我什么|你可以帮我什么|你是谁|你叫什么|介绍(?:一下)?你自己|"
+    r"你有什么功能|你的功能是什么|你的职责是什么|你的作用是什么|"
+    r"你(?:知道|了解|掌握)(?:什么|哪些内容|哪些知识)|"
+    r"知识库(?:里|中)?有(?:什么|哪些)(?:文档|文件|资料|内容)|"
+    r"(?:列出|展示|总结|介绍)(?:你的|知识库的)?(?:文档|文件|内容|功能)|"
+    r"帮助|求助|帮帮我"
     r")[!.,?\s]*$",
     re.IGNORECASE,
 )
@@ -185,6 +212,7 @@ def _meta_event(
     refusal_reason: str | None = None,
     candidate_sources: list[dict[str, Any]] | None = None,
     debug_chunks: list[dict[str, Any]] | None = None,
+    language_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     data: dict[str, Any] = {
         "refused": refused,
@@ -203,6 +231,8 @@ def _meta_event(
     }
     if intent is not None:
         data["intent"] = intent
+    if language_meta:
+        data["language"] = language_meta
     return {"event": "meta", "data": data}
 
 
@@ -212,14 +242,27 @@ def assemble_rag_messages(
     question: str,
     retrieved_chunks: list[RetrievedChunk],
     history: list[dict[str, str]] | None = None,
+    target_language: str = "en",
 ) -> list[dict[str, str]]:
-    """Assemble system preamble + fixed grounding rules, trimmed history, and numbered context."""
+    """Assemble system preamble + fixed grounding rules, trimmed history, and numbered context (§4.3)."""
+    lang_entry = LANGUAGE_BY_CODE.get(target_language) or LANGUAGE_BY_CODE["en"]
+    target_refusal = profile.get_refusal_message(target_language)
+
     preamble_part = profile.preamble.strip()
     system_parts: list[str] = []
     if preamble_part:
         system_parts.append(preamble_part)
+
+    grounding_rules = (
+        "Answer only using the numbered context passages. Cite passages as [n]. "
+        "If the passages do not contain the answer, reply exactly with the refusal message "
+        "and briefly state what information is missing. Do not use outside knowledge. "
+        f"Answer in {lang_entry.instruction_name}. Keep citation markers [n] exactly as they are. "
+        "Keep product names, model numbers, units, and quoted document titles as written in the source; "
+        "translate everything else."
+    )
     system_parts.append(
-        f"{FIXED_GROUNDING_RULES}\nRefusal message: \"{profile.refusal_message.strip()}\""
+        f"{grounding_rules}\nRefusal message: \"{target_refusal}\""
     )
     system_content = "\n\n".join(system_parts)
 
@@ -232,7 +275,11 @@ def assemble_rag_messages(
         context_blocks.append(f"[{idx}] (Source: {label})\n{chunk.text}")
 
     joined_context = "\n\n".join(context_blocks)
-    user_payload = f"Context passages:\n{joined_context}\n\nQuestion: {question.strip()}"
+    user_payload = (
+        f"Context passages:\n{joined_context}\n\n"
+        f"Question: {question.strip()}\n"
+        f"Answer in {lang_entry.instruction_name}."
+    )
     messages.append({"role": "user", "content": user_payload})
     return messages
 
@@ -244,13 +291,19 @@ def assemble_conversational_messages(
     documents_overview: list[dict[str, Any]],
     sample_snippets: list[dict[str, Any]],
     history: list[dict[str, str]] | None = None,
+    target_language: str = "en",
 ) -> list[dict[str, str]]:
     """Assemble bounded prompt for greetings and 'What can you help me with?' queries."""
+    lang_entry = LANGUAGE_BY_CODE.get(target_language) or LANGUAGE_BY_CODE["en"]
     persona = profile.preamble.strip() or f"You are {profile.name}, a local knowledge base assistant."
+    conversational_rules = (
+        f"{CONVERSATIONAL_GROUNDING_RULES} "
+        f"Answer in {lang_entry.instruction_name}."
+    )
     system_content = (
         f"Assistant Name: {profile.name}\n"
         f"Persona / Preamble: {persona}\n\n"
-        f"{CONVERSATIONAL_GROUNDING_RULES}"
+        f"{conversational_rules}"
     )
 
     indexed_docs = [d for d in documents_overview if d.get("status") == "indexed"]
@@ -282,10 +335,51 @@ def assemble_conversational_messages(
     messages.append(
         {
             "role": "user",
-            "content": f"{kb_summary}\n\nUser message: {question.strip()}",
+            "content": f"{kb_summary}\n\nUser message: {question.strip()}\nAnswer in {lang_entry.instruction_name}.",
         }
     )
     return messages
+
+
+def _build_timings(
+    *,
+    t_start: float,
+    embed_ms: float | None = None,
+    retrieval_ms: float | None = None,
+    time_to_first_token_ms: float | None = None,
+    chat_stats: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Assemble per-response pipeline and Ollama generation timing breakdown."""
+    total_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
+    timings: dict[str, Any] = {
+        "embed_ms": embed_ms,
+        "retrieval_ms": retrieval_ms,
+        "time_to_first_token_ms": time_to_first_token_ms,
+        "total_ms": total_ms,
+    }
+    if chat_stats:
+        for key in (
+            "prompt_eval_count",
+            "prompt_eval_duration",
+            "eval_count",
+            "eval_duration",
+        ):
+            if key in chat_stats and chat_stats[key] is not None:
+                timings[key] = chat_stats[key]
+
+        prompt_dur = chat_stats.get("prompt_eval_duration")
+        if isinstance(prompt_dur, (int, float)) and prompt_dur >= 0:
+            timings["prompt_eval_ms"] = round(prompt_dur / 1_000_000.0, 2)
+
+        eval_dur = chat_stats.get("eval_duration")
+        eval_cnt = chat_stats.get("eval_count")
+        if isinstance(eval_dur, (int, float)) and eval_dur >= 0:
+            timings["eval_ms"] = round(eval_dur / 1_000_000.0, 2)
+            if isinstance(eval_cnt, (int, float)) and eval_dur > 0:
+                timings["tokens_per_second"] = round(
+                    eval_cnt / (eval_dur / 1_000_000_000.0), 2
+                )
+    return timings
 
 
 @dataclass
@@ -304,6 +398,11 @@ class RAGResponse:
     fallback_active: bool = False
     fallback_banner: str | None = None
     conversational: bool = False
+    timings: dict[str, Any] = field(default_factory=dict)
+    target_language: str = "en"
+    detected_language: str = "en"
+    language_confidence: float = 0.0
+    language_rule: str = "fallback"
 
 
 class RAGEngine:
@@ -326,17 +425,21 @@ class RAGEngine:
         messages: list[dict[str, str]],
         model: str,
         options: dict[str, Any],
-    ) -> Generator[dict[str, Any], None, str]:
+        t_start: float,
+    ) -> Generator[dict[str, Any], None, tuple[str, float | None]]:
         collected: list[str] = []
+        ttft_ms: float | None = None
         for token in self.backend.chat(
             messages=messages,
             model=model,
             options=options,
             stream=True,
         ):
+            if ttft_ms is None:
+                ttft_ms = round((time.perf_counter() - t_start) * 1000.0, 2)
             collected.append(token)
             yield {"event": "token", "data": {"text": token}}
-        return "".join(collected).strip()
+        return "".join(collected).strip(), ttft_ms
 
     def stream_query(
         self,
@@ -346,14 +449,26 @@ class RAGEngine:
         history: list[dict[str, str]] | None = None,
         runtime_options: dict[str, Any] | None = None,
         documents_overview: list[dict[str, Any]] | None = None,
+        requested_language: str | None = None,
     ) -> Iterator[dict[str, Any]]:
         """Execute full RAG flow and yield structured events ('status', 'meta', 'token', 'done').
 
         Guarantees that when the refusal gate fails on factual queries, backend.chat() is NEVER called.
         """
+        t_start = time.perf_counter()
         cleaned_question = question.strip()
         if not cleaned_question:
             raise ValidationError("Message cannot be empty.")
+
+        lang_res = resolve_target_language(
+            latest_user_message=cleaned_question,
+            history=history,
+            profile_default_language=profile.default_language,
+            requested_language=requested_language,
+        )
+        target_lang_code = lang_res.target_language
+        target_refusal_message = profile.get_refusal_message(target_lang_code)
+        lang_meta = lang_res.to_dict()
 
         (
             effective_chat_model,
@@ -389,6 +504,7 @@ class RAGEngine:
                 documents_overview=documents_overview or [],
                 sample_snippets=samples,
                 history=history,
+                target_language=target_lang_code,
             )
             gen_label = (
                 f"Thinking with {effective_chat_model}…"
@@ -408,12 +524,19 @@ class RAGEngine:
                 best_score=1.0,
                 conversational=True,
                 intent=conv_intent,
+                language_meta=lang_meta,
             )
 
-            conv_text = yield from self._stream_chat_tokens(
+            conv_text, ttft_ms = yield from self._stream_chat_tokens(
                 messages=conv_messages,
                 model=effective_chat_model,
                 options=merged_options,
+                t_start=t_start,
+            )
+            timings = _build_timings(
+                t_start=t_start,
+                time_to_first_token_ms=ttft_ms,
+                chat_stats=self.backend.get_last_chat_stats(),
             )
             yield {
                 "event": "done",
@@ -423,6 +546,8 @@ class RAGEngine:
                     "conversational": True,
                     "refusal_reason": None,
                     "sources": [],
+                    "timings": timings,
+                    "language": lang_meta,
                 },
             }
             return
@@ -432,15 +557,22 @@ class RAGEngine:
 
         inspection = self.vectorstore.inspect_collection(profile.id)
         retrieved: list[RetrievedChunk] = []
+        embed_ms: float | None = None
+        retrieval_ms: float | None = None
         if inspection.exists and inspection.chunk_count > 0:
+            t_embed_start = time.perf_counter()
             query_vectors = self.backend.embed([retrieval_query], model=effective_embed_model)
+            embed_ms = round((time.perf_counter() - t_embed_start) * 1000.0, 2)
             query_vec = query_vectors[0]
+
+            t_retrieval_start = time.perf_counter()
             retrieved = self.vectorstore.query(
                 profile_id=profile.id,
                 query_embedding=query_vec,
                 expected_embedding_model=profile.embedding_model,
                 top_k=profile.top_k,
             )
+            retrieval_ms = round((time.perf_counter() - t_retrieval_start) * 1000.0, 2)
 
         best_score = retrieved[0].score if retrieved else 0.0
         candidate_sources = [
@@ -453,7 +585,7 @@ class RAGEngine:
                 f"No relevant content found in this bot's knowledge base. "
                 f"Best match scored {best_score:.2f}, threshold is {profile.similarity_threshold:.2f}."
             )
-            refusal_text = f"{profile.refusal_message.strip()} {reason}"
+            refusal_text = f"{target_refusal_message.strip()} {reason}"
             yield _meta_event(
                 profile=profile,
                 effective_chat_model=effective_chat_model,
@@ -464,8 +596,14 @@ class RAGEngine:
                 refused=True,
                 refusal_reason=reason,
                 debug_chunks=candidate_sources,
+                language_meta=lang_meta,
             )
             yield {"event": "token", "data": {"text": refusal_text}}
+            timings = _build_timings(
+                t_start=t_start,
+                embed_ms=embed_ms,
+                retrieval_ms=retrieval_ms,
+            )
             yield {
                 "event": "done",
                 "data": {
@@ -474,6 +612,8 @@ class RAGEngine:
                     "conversational": False,
                     "refusal_reason": reason,
                     "sources": [],
+                    "timings": timings,
+                    "language": lang_meta,
                 },
             }
             return
@@ -484,6 +624,7 @@ class RAGEngine:
             question=cleaned_question,
             retrieved_chunks=retrieved,
             history=history,
+            target_language=target_lang_code,
         )
 
         gen_stage_label = (
@@ -504,14 +645,30 @@ class RAGEngine:
             best_score=best_score,
             candidate_sources=candidate_sources,
             debug_chunks=candidate_sources,
+            language_meta=lang_meta,
         )
 
-        full_text = yield from self._stream_chat_tokens(
+        full_text, ttft_ms = yield from self._stream_chat_tokens(
             messages=messages,
             model=effective_chat_model,
             options=merged_options,
+            t_start=t_start,
         )
-        prompt_refused = full_text.lower().startswith(profile.refusal_message.strip().lower())
+        timings = _build_timings(
+            t_start=t_start,
+            embed_ms=embed_ms,
+            retrieval_ms=retrieval_ms,
+            time_to_first_token_ms=ttft_ms,
+            chat_stats=self.backend.get_last_chat_stats(),
+        )
+
+        # Check target language refusal first, then all languages
+        prompt_refused = full_text.lower().startswith(target_refusal_message.strip().lower())
+        if not prompt_refused:
+            for other_ref in profile.refusal_messages.values():
+                if other_ref and full_text.lower().startswith(other_ref.strip().lower()):
+                    prompt_refused = True
+                    break
 
         # Filter returned sources strictly to passages actually cited as [n] in the answer
         cited_indices = set(
@@ -538,6 +695,8 @@ class RAGEngine:
                 else None,
                 "sources": used_sources,
                 "debug_chunks": enriched_debug,
+                "timings": timings,
+                "language": lang_meta,
             },
         }
 
@@ -549,6 +708,7 @@ class RAGEngine:
         history: list[dict[str, str]] | None = None,
         runtime_options: dict[str, Any] | None = None,
         documents_overview: list[dict[str, Any]] | None = None,
+        requested_language: str | None = None,
     ) -> RAGResponse:
         """Synchronous convenience wrapper around stream_query for tests and CLI tools."""
         meta_data: dict[str, Any] = {}
@@ -561,6 +721,7 @@ class RAGEngine:
             history=history,
             runtime_options=runtime_options,
             documents_overview=documents_overview,
+            requested_language=requested_language,
         ):
             ev = item["event"]
             if ev == "meta":
@@ -571,6 +732,7 @@ class RAGEngine:
                 done_data = item["data"]
 
         answer = str(done_data.get("full_text") or "".join(tokens)).strip()
+        lang_info = done_data.get("language") or meta_data.get("language") or {}
         return RAGResponse(
             answer=answer,
             refused=bool(done_data.get("refused", meta_data.get("refused", False))),
@@ -584,4 +746,9 @@ class RAGEngine:
             fallback_active=bool(meta_data.get("fallback_active", False)),
             fallback_banner=meta_data.get("fallback_banner"),
             conversational=bool(done_data.get("conversational", meta_data.get("conversational", False))),
+            timings=dict(done_data.get("timings", {})),
+            target_language=str(lang_info.get("target_language", "en")),
+            detected_language=str(lang_info.get("detected_language", "en")),
+            language_confidence=float(lang_info.get("language_confidence", 0.0)),
+            language_rule=str(lang_info.get("language_rule", "fallback")),
         )

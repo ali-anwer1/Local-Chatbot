@@ -20,11 +20,15 @@ from app.core.errors import (
     ProfileNotFoundError,
     ValidationError,
 )
+from app.core.languages import (
+    DEFAULT_REFUSAL_MESSAGES,
+    SUPPORTED_LANGUAGE_CODES,
+)
 
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_REFUSAL_MESSAGE = "I can't answer that from my knowledge base."
+DEFAULT_REFUSAL_MESSAGE = DEFAULT_REFUSAL_MESSAGES["en"]
 MAX_SETTINGS_HISTORY_ENTRIES = 10
 
 
@@ -76,6 +80,17 @@ def _coerce_raw_str(val: Any) -> str:
     return "" if val is None else str(val)
 
 
+def _coerce_refusal_messages(val: Any) -> dict[str, str]:
+    merged = dict(DEFAULT_REFUSAL_MESSAGES)
+    if isinstance(val, dict):
+        for k, v in val.items():
+            if k in SUPPORTED_LANGUAGE_CODES and v is not None:
+                s = str(v).strip()
+                if s:
+                    merged[k] = s
+    return merged
+
+
 _PROFILE_MUTABLE_COERCERS: dict[str, Any] = {
     "name": _coerce_stripped_str,
     "preamble": _coerce_raw_str,
@@ -89,6 +104,8 @@ _PROFILE_MUTABLE_COERCERS: dict[str, Any] = {
     "chunk_overlap": int,
     "history_turns": int,
     "enable_thinking": bool,
+    "default_language": _coerce_stripped_str,
+    "refusal_messages": _coerce_refusal_messages,
 }
 
 
@@ -117,6 +134,10 @@ class Profile:
     chunk_overlap: int = 150
     history_turns: int = 4
     enable_thinking: bool = False
+    default_language: str = "en"
+    refusal_messages: dict[str, str] = field(
+        default_factory=lambda: dict(DEFAULT_REFUSAL_MESSAGES)
+    )
     settings_history: list[dict[str, Any]] = field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
@@ -140,16 +161,47 @@ class Profile:
             raise ValidationError("chunk_overlap must be >= 0 and strictly less than chunk_size.")
         if not (0 <= self.history_turns <= 20):
             raise ValidationError("history_turns must be between 0 and 20.")
+        if not self.default_language or self.default_language not in SUPPORTED_LANGUAGE_CODES:
+            self.default_language = "en"
+        if not isinstance(self.refusal_messages, dict):
+            self.refusal_messages = dict(DEFAULT_REFUSAL_MESSAGES)
+        for code in SUPPORTED_LANGUAGE_CODES:
+            if not self.refusal_messages.get(code) or not self.refusal_messages[code].strip():
+                self.refusal_messages[code] = DEFAULT_REFUSAL_MESSAGES[code]
         if not self.refusal_message or not self.refusal_message.strip():
-            self.refusal_message = DEFAULT_REFUSAL_MESSAGE
+            self.refusal_message = self.refusal_messages.get("en", DEFAULT_REFUSAL_MESSAGE)
+        else:
+            self.refusal_messages["en"] = self.refusal_message
+
+    def get_refusal_message(self, lang_code: str) -> str:
+        """Return the refusal message for the given language code, falling back gracefully."""
+        return (
+            self.refusal_messages.get(lang_code)
+            or self.refusal_messages.get(self.default_language)
+            or self.refusal_messages.get("en")
+            or DEFAULT_REFUSAL_MESSAGE
+        )
 
     def with_updates(self, payload: dict[str, Any]) -> Profile:
         """Return a copy with coerced mutable fields updated, ignoring unknown/immutable keys."""
-        updates = {
-            key: _PROFILE_MUTABLE_COERCERS[key](val)
-            for key, val in payload.items()
-            if key in _PROFILE_MUTABLE_COERCERS and val is not None
-        }
+        updates: dict[str, Any] = {}
+        for key, val in payload.items():
+            if key in _PROFILE_MUTABLE_COERCERS and val is not None:
+                updates[key] = _PROFILE_MUTABLE_COERCERS[key](val)
+
+        # Synchronize refusal_message string and refusal_messages dict
+        if "refusal_messages" in updates:
+            ref_dict = dict(updates["refusal_messages"])
+            if "refusal_message" in updates:
+                ref_dict["en"] = updates["refusal_message"]
+            else:
+                updates["refusal_message"] = ref_dict.get("en", self.refusal_message)
+            updates["refusal_messages"] = ref_dict
+        elif "refusal_message" in updates:
+            ref_dict = dict(self.refusal_messages)
+            ref_dict["en"] = updates["refusal_message"]
+            updates["refusal_messages"] = ref_dict
+
         return replace(
             self,
             settings_history=list(self.settings_history),
@@ -170,10 +222,29 @@ class Profile:
         now = _utc_now_iso()
         raw_hist = data.get("settings_history")
         hist = [item for item in raw_hist if isinstance(item, dict)] if isinstance(raw_hist, list) else []
+
+        # Migration logic: populate per-language refusal messages from legacy single refusal_message
+        migrated_refusals = dict(DEFAULT_REFUSAL_MESSAGES)
+        raw_refusals = data.get("refusal_messages")
+        if isinstance(raw_refusals, dict):
+            for code, msg in raw_refusals.items():
+                if code in SUPPORTED_LANGUAGE_CODES and msg:
+                    migrated_refusals[code] = str(msg).strip()
+        raw_single_refusal = data.get("refusal_message")
+        if raw_single_refusal and str(raw_single_refusal).strip():
+            migrated_refusals["en"] = str(raw_single_refusal).strip()
+
+        default_lang = str(data.get("default_language") or "en").strip().lower()
+        if default_lang not in SUPPORTED_LANGUAGE_CODES:
+            default_lang = "en"
+
         base = cls(
             id=str(data["id"]),
             chat_model=default_chat_model,
             embedding_model=default_embedding_model,
+            default_language=default_lang,
+            refusal_messages=migrated_refusals,
+            refusal_message=migrated_refusals.get("en", DEFAULT_REFUSAL_MESSAGE),
             settings_history=hist[:MAX_SETTINGS_HISTORY_ENTRIES],
             created_at=str(data.get("created_at") or now),
             updated_at=str(data.get("updated_at") or now),
@@ -212,6 +283,7 @@ _PROFILE_CHANGE_SPECS: list[tuple[str, str, Any]] = [
     ("history_turns", "History Turns", _fmt_arrow),
     ("refusal_message", "Refusal Message", _fmt_label_only),
     ("enable_thinking", "Thinking Mode", _fmt_on_off),
+    ("default_language", "Default Language", _fmt_arrow),
 ]
 
 

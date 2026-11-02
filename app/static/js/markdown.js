@@ -1,4 +1,4 @@
-/* Assistant Markdown and inline citation chip formatter */
+/* Assistant Markdown and inline citation formatter */
 
 import { escapeHtml } from "./utils.js";
 
@@ -48,7 +48,7 @@ export function formatAssistantMarkdownAndCitations(text, sourcesMap) {
   // Bold **...**
   safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 
-  // Clickable inline citations [1], [1, 2], [1-3], [Source 1], [Passage 2]
+  // Clickable inline citations [1], [1, 2], [1-3], [Source 1], [Passage 2] -> superscript [1]
   safe = safe.replace(
     /\[(?:(?:passage|source|doc|ref)s?\s*)?(\d+(?:\s*(?:,|-|–)\s*\d+)*)\]/gi,
     (fullMatch, expr) => {
@@ -56,9 +56,9 @@ export function formatAssistantMarkdownAndCitations(text, sourcesMap) {
       if (nums.length === 0) return fullMatch;
       const chips = nums.map((num) => {
         if (sourcesMap && sourcesMap.has(num)) {
-          return `<button type="button" class="citation-chip" data-cite-idx="${num}" aria-label="View source citation ${num}">[${num}]</button>`;
+          return `<sup><button type="button" class="citation-sup citation-chip" data-cite-idx="${num}" aria-label="Source citation ${num}">[${num}]</button></sup>`;
         }
-        return `[${num}]`;
+        return `<sup>[${num}]</sup>`;
       });
       return chips.join(" ");
     }

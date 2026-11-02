@@ -12,7 +12,7 @@ from fastapi import FastAPI, File, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictStr
 import uvicorn
 
 from app.config import load_config
@@ -26,6 +26,10 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 class PullModelRequest(BaseModel):
     model: str
     confirmed: bool = False
+
+
+class AppSettingsPayload(BaseModel):
+    embedding_device: StrictStr
 
 
 class ProfilePayload(BaseModel):
@@ -42,6 +46,8 @@ class ProfilePayload(BaseModel):
     history_turns: int | None = None
     enable_thinking: bool | None = None
     confirm_reindex: bool = False
+    default_language: str | None = None
+    refusal_messages: dict[str, str] | None = None
 
 
 class ChatRequest(BaseModel):
@@ -49,6 +55,14 @@ class ChatRequest(BaseModel):
     session_id: str = "default"
     history: list[dict[str, str]] | None = None
     options: dict[str, Any] | None = Field(default=None)
+    requested_language: str | None = None
+
+
+class TranslateRequest(BaseModel):
+    text: str
+    target_language: str
+    source_language: str | None = None
+    profile_id: str | None = None
 
 
 class SaveChatRequest(BaseModel):
@@ -173,6 +187,18 @@ def create_app(service: ChatbotService | None = None) -> FastAPI:
     def get_health(refresh: bool = Query(default=False)) -> dict[str, Any]:
         return svc.get_health(force_refresh=refresh)
 
+    @app.get("/api/app-settings")
+    def get_app_settings() -> dict[str, Any]:
+        return svc.get_app_settings()
+
+    @app.put("/api/app-settings")
+    def update_app_settings(body: AppSettingsPayload) -> dict[str, Any]:
+        return svc.update_app_settings(body.model_dump())
+
+    @app.get("/api/languages")
+    def get_languages() -> list[dict[str, Any]]:
+        return svc.list_languages()
+
     @app.get("/api/models")
     def get_models(refresh: bool = Query(default=False)) -> dict[str, Any]:
         return svc.list_models(force_refresh=refresh)
@@ -283,6 +309,17 @@ def create_app(service: ChatbotService | None = None) -> FastAPI:
             message=body.message,
             history=body.history,
             runtime_options=body.options,
+            requested_language=body.requested_language,
+        )
+        return _stream_sse_with_priming(events)
+
+    @app.post("/api/translate")
+    def translate_text(body: TranslateRequest) -> StreamingResponse:
+        events = svc.stream_translate(
+            text=body.text,
+            target_language=body.target_language,
+            source_language=body.source_language,
+            profile_id=body.profile_id,
         )
         return _stream_sse_with_priming(events)
 

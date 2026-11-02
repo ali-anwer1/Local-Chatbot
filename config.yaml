@@ -9,3 +9,9 @@ default_chat_model: "qwen3.5:4b"
 default_embedding_model: "nomic-embed-text"
 allow_chat_fallback: true
 model_cache_ttl_seconds: 30
+
+# Device for the embedding model: "cpu" (keeps iGPU memory free for the chat model) or "auto" (let Ollama decide).
+embedding_device: "cpu"
+
+# How long Ollama keeps chat and embedding models loaded in memory between requests.
+keep_alive: "30m"

@@ -13,8 +13,6 @@ export const el = {
   btnOpenLeftSidebar: document.getElementById("btn-open-left-sidebar"),
   btnOpenLeftSidebarAlt: document.getElementById("btn-open-left-sidebar-alt"),
   emptyStageTopbar: document.getElementById("empty-stage-topbar"),
-  btnSidebarNewChat: document.getElementById("btn-sidebar-new-chat"),
-  btnHeaderNewChat: document.getElementById("btn-header-new-chat"),
 
   profileList: document.getElementById("profile-list"),
   savedChatsSection: document.getElementById("saved-chats-section"),
@@ -36,10 +34,12 @@ export const el = {
   btnKbPill: document.getElementById("btn-kb-pill"),
   activeKbBadge: document.getElementById("active-kb-badge"),
 
+  btnClearChat: document.getElementById("btn-clear-chat"),
+  btnOverflowMenu: document.getElementById("btn-overflow-menu"),
+  chatOverflowMenu: document.getElementById("chat-overflow-menu"),
   btnSaveChat: document.getElementById("btn-save-chat"),
   btnSaveChatLabel: document.getElementById("btn-save-chat-label"),
   btnExportChat: document.getElementById("btn-export-chat"),
-  btnClearChat: document.getElementById("btn-clear-chat"),
   toggleDebug: document.getElementById("toggle-debug"),
   btnToggleSettings: document.getElementById("btn-toggle-settings"),
   profileBanners: document.getElementById("profile-banners"),
@@ -47,10 +47,14 @@ export const el = {
   chatMessages: document.getElementById("chat-messages"),
   chatWelcome: document.getElementById("chat-welcome"),
   welcomeHeading: document.getElementById("welcome-heading"),
+  welcomePreamble: document.getElementById("welcome-preamble"),
+  welcomeDocList: document.getElementById("welcome-doc-list"),
+  welcomeExamples: document.getElementById("welcome-examples"),
   chatForm: document.getElementById("chat-form"),
   chatInput: document.getElementById("chat-input"),
   btnThinkingToggle: document.getElementById("btn-thinking-toggle"),
   thinkingPillLabel: document.getElementById("thinking-pill-label"),
+  selectAnswerLanguage: document.getElementById("select-answer-language"),
   btnSendChat: document.getElementById("btn-send-chat"),
   btnStopStream: document.getElementById("btn-stop-stream"),
 
@@ -70,6 +74,7 @@ export const el = {
 
   settingsForm: document.getElementById("profile-settings-form"),
   settingName: document.getElementById("setting-name"),
+  settingDefaultLanguage: document.getElementById("setting-default-language"),
   settingPreamble: document.getElementById("setting-preamble"),
   settingChatModel: document.getElementById("setting-chat-model"),
   settingThinking: document.getElementById("setting-thinking"),
@@ -86,6 +91,8 @@ export const el = {
   btnSaveSettings: document.getElementById("btn-save-settings"),
   settingsHistoryBox: document.getElementById("settings-history-box"),
   btnDeleteProfile: document.getElementById("btn-delete-profile"),
+  settingEmbeddingDevice: document.getElementById("setting-embedding-device"),
+  appSettingsFeedback: document.getElementById("app-settings-feedback"),
 
   dialogNewProfile: document.getElementById("dialog-new-profile"),
   formNewProfile: document.getElementById("form-new-profile"),
@@ -140,4 +147,7 @@ export const el = {
   btnCloseSaveChatX: document.getElementById("btn-close-save-chat-x"),
   saveChatTitle: document.getElementById("save-chat-title"),
   btnCancelSaveChat: document.getElementById("btn-cancel-save-chat"),
+
+  infoTooltipPopover: document.getElementById("info-tooltip-popover"),
+  translateDropdownPopover: document.getElementById("translate-dropdown-popover"),
 };

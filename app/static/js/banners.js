@@ -68,7 +68,7 @@ export function renderProfileBanners(prof, avail) {
       const picker = makeModelPicker(installedEmbeds, "Switch to installed embedding model");
       actions.push(
         picker,
-        makeActionButton("Switch & Re-index…", "btn small", () => {
+        makeActionButton("Switch and re-index…", "btn small", () => {
           requestEmbeddingModelSwitch(picker.value);
         })
       );
@@ -87,12 +87,13 @@ export function renderProfileBanners(prof, avail) {
     const message =
       avail.block_message ||
       "Embedding model or vector dimension does not match the knowledge base index metadata.";
+    const docCount = prof.document_count || 0;
     el.profileBanners.appendChild(
       makeBanner("danger", message, [
-        makeActionButton("Re-index Knowledge Base…", "btn small primary", () => {
+        makeActionButton("Re-index knowledge base…", "btn small primary", () => {
           openReindexConfirmDialog({
             mode: "explicit_reindex",
-            message: `Re-index all ${prof.document_count || 0} document(s) (~${prof.total_chunks || 0} chunks) using '${prof.embedding_model}'?`,
+            message: `Re-index all ${docCount} document${docCount === 1 ? "" : "s"} (~${prof.total_chunks || 0} chunks) using '${prof.embedding_model}'?`,
           });
         }),
       ])
@@ -119,7 +120,7 @@ export function renderProfileBanners(prof, avail) {
         const picker = makeModelPicker(installedChats, "Pick an installed chat model");
         actions.push(
           picker,
-          makeActionButton("Use Selected Model", "btn small", async () => {
+          makeActionButton("Use selected model", "btn small", async () => {
             await saveProfilePatch({ chat_model: picker.value });
           })
         );

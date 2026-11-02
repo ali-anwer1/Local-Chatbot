@@ -1,0 +1,126 @@
+{
+  "profile": {
+    "name": "Astra NX-200 技术助理",
+    "preamble": "您是 Astra NX-200 工业边缘网关的内部硬件工程与现场支持技术助理。请严格根据提供的文档给出准确、简洁的技术答案，并始终引用您的来源段落。"
+  },
+  "questions": [
+    {
+      "id": "in_01",
+      "category": "in_scope",
+      "question": "Astra NX-200 标配的处理器、内存（RAM）和板载闪存存储是什么？",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_datasheet.pdf",
+      "expected_page": 1,
+      "expected_keywords": ["Cortex-A78AE", "8 GB", "64 GB"]
+    },
+    {
+      "id": "in_02",
+      "category": "in_scope",
+      "question": "NX-200 的可接受直流输入电压范围和峰值功耗是多少？",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_datasheet.pdf",
+      "expected_page": 2,
+      "expected_keywords": ["12 V", "48 V", "34 W"]
+    },
+    {
+      "id": "in_03",
+      "category": "in_scope",
+      "question": "ETH1 端口可以提供多少 PoE+ 功率，串口的电气隔离额定值是多少？",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_datasheet.pdf",
+      "expected_page": 3,
+      "expected_keywords": ["25.5 W", "2.5 kVrms"]
+    },
+    {
+      "id": "in_04",
+      "category": "in_scope",
+      "question": "在预防性维护期间，RTC 备用电池多久必须更换一次，指定的电池型号是什么？",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_maintenance_sop.docx",
+      "expected_keywords": ["36", "CR2032W"]
+    },
+    {
+      "id": "in_05",
+      "category": "in_scope",
+      "question": "更换导热垫时需要什么备件包、导热垫厚度和 M3 紧固件扭矩？",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_maintenance_sop.docx",
+      "expected_keywords": ["AST-TPAD-15", "1.5 mm", "0.65"]
+    },
+    {
+      "id": "in_06",
+      "category": "in_scope",
+      "question": "如何进入 NX-200 的固件恢复模式，恢复控制台的静态 IP 和端口是多少？",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_maintenance_sop.docx",
+      "expected_keywords": ["192.168.200.1", "8443"]
+    },
+    {
+      "id": "in_07",
+      "category": "in_scope",
+      "question": "标准硬件保修期是多久，AstraCare Plus 延长保修期多长时间？",
+      "expected_refusal": false,
+      "expected_source_file": "astra_warranty_and_sla.md",
+      "expected_keywords": ["36", "60"]
+    },
+    {
+      "id": "in_08",
+      "category": "in_scope",
+      "question": "P1 工程响应时间 SLA 是多少，故障 RMA 设备必须在多少天内退回？",
+      "expected_refusal": false,
+      "expected_source_file": "astra_warranty_and_sla.md",
+      "expected_keywords": ["14"]
+    },
+    {
+      "id": "in_09",
+      "category": "in_scope",
+      "question": "Astra NX-200 上红黄交替闪烁的 STAT LED 指示灯模式代表什么含义？",
+      "expected_refusal": false,
+      "expected_source_file": "astra_field_faq.txt",
+      "expected_keywords": ["TPM", "E-409"]
+    },
+    {
+      "id": "in_10",
+      "category": "in_scope",
+      "question": "DIN 导轨上的 NX-200 散热器上方和下方需要多少垂直气流间隙？",
+      "expected_refusal": false,
+      "expected_source_file": "astra_field_faq.txt",
+      "expected_keywords": ["35 mm"]
+    },
+    {
+      "id": "out_01",
+      "category": "out_of_scope",
+      "question": "法国的首都是哪里，目前的人口是多少？",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_02",
+      "category": "out_of_scope",
+      "question": "编写一个实现快速排序算法的 Python 函数。",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_03",
+      "category": "out_of_scope",
+      "question": "根据人力资源政策，全职员工享有多少天的带薪年假？",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_04",
+      "category": "out_of_scope",
+      "question": "制作酸酵母欧包的配方和烘烤温度是多少？",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_05",
+      "category": "out_of_scope",
+      "question": "英伟达（NVIDIA）的股票代码和第三季度营收是多少？",
+      "expected_refusal": true,
+      "expected_keywords": []
+    }
+  ]
+}

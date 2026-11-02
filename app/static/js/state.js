@@ -2,6 +2,7 @@
 
 export const state = {
   health: null,
+  appSettings: { embedding_device: "cpu", keep_alive: "30m" },
   profiles: [],
   activeProfileId: null,
   activeProfile: null,
@@ -12,6 +13,7 @@ export const state = {
   docSearchQuery: "",
   docFilter: "all", // "all" | "indexed" | "warnings"
   settingsFeedbackTimer: null,
+  appSettingsFeedbackTimer: null,
   chatAbortController: null,
   pullAbortController: null,
   pendingReindexPayload: null,

@@ -8,6 +8,7 @@ import {
   formatTimestamp,
   isThinkingEnabled,
   populateModelSelect,
+  showFeedback,
   showSettingsFeedback,
   tagsMatch,
 } from "./utils.js";
@@ -25,6 +26,9 @@ export function configureSettings({ renderProfileSidebar, renderMainView, select
 export function renderSettingsForm(prof, opts = {}) {
   const h = state.health || {};
   el.settingName.value = prof.name || "";
+  if (el.settingDefaultLanguage) {
+    el.settingDefaultLanguage.value = prof.default_language || "en";
+  }
   el.settingPreamble.value = prof.preamble || "";
   populateModelSelect(
     el.settingChatModel,
@@ -50,7 +54,12 @@ export function renderSettingsForm(prof, opts = {}) {
   el.settingChunkSize.value = prof.chunk_size ?? 1000;
   el.settingChunkOverlap.value = prof.chunk_overlap ?? 150;
   el.settingHistoryTurns.value = prof.history_turns ?? 4;
-  el.settingRefusalMsg.value = prof.refusal_message || "";
+  const refusalMsgs = prof.refusal_messages || {};
+  el.settingRefusalMsg.value = refusalMsgs.en || prof.refusal_message || "";
+  document.querySelectorAll(".refusal-lang-fields input[data-lang]").forEach((input) => {
+    const lang = input.dataset.lang;
+    input.value = refusalMsgs[lang] || "";
+  });
 
   if (!opts.preserveFeedback) {
     if (state.settingsFeedbackTimer) {
@@ -67,7 +76,7 @@ export function renderSettingsHistory(prof) {
 
   if (history.length === 0) {
     const p = document.createElement("div");
-    p.textContent = `No setting edits saved yet · Created ${formatTimestamp(prof.created_at)}`;
+    p.textContent = `No settings edits saved yet · Created ${formatTimestamp(prof.created_at)}`;
     el.settingsHistoryBox.appendChild(p);
     return;
   }
@@ -106,9 +115,21 @@ export function renderSettingsHistory(prof) {
 }
 
 export function collectSettingsPayload() {
+  const refusalMessages = {
+    en: el.settingRefusalMsg.value.trim(),
+  };
+  document.querySelectorAll(".refusal-lang-fields input[data-lang]").forEach((input) => {
+    const lang = input.dataset.lang;
+    const val = input.value.trim();
+    if (val) {
+      refusalMessages[lang] = val;
+    }
+  });
+
   return {
     name: el.settingName.value.trim(),
     preamble: el.settingPreamble.value,
+    default_language: el.settingDefaultLanguage ? el.settingDefaultLanguage.value : "en",
     chat_model: el.settingChatModel.value,
     embedding_model: el.settingEmbedModel.value,
     enable_thinking: Boolean(el.settingThinking.checked),
@@ -119,6 +140,7 @@ export function collectSettingsPayload() {
     chunk_overlap: parseInt(el.settingChunkOverlap.value, 10),
     history_turns: parseInt(el.settingHistoryTurns.value, 10),
     refusal_message: el.settingRefusalMsg.value.trim(),
+    refusal_messages: refusalMessages,
   };
 }
 
@@ -138,7 +160,7 @@ export function requestEmbeddingModelSwitch(newEmbedModel) {
   openReindexConfirmDialog({
     mode: "update_profile",
     payload: { ...collectSettingsPayload(), embedding_model: newEmbedModel },
-    message: `Changing the embedding model from '${prof.embedding_model}' to '${newEmbedModel}' will re-index the entire knowledge base (~${chunkCount} chunk(s) across ${docCount} document(s)). Nothing will change unless you confirm.`,
+    message: `Changing the embedding model from '${prof.embedding_model}' to '${newEmbedModel}' will re-index the entire knowledge base (~${chunkCount} chunk${chunkCount === 1 ? "" : "s"} across ${docCount} document${docCount === 1 ? "" : "s"}). Nothing will change unless you confirm.`,
   });
 }
 
@@ -163,7 +185,7 @@ export async function saveProfilePatch(patch, confirmReindex = false) {
     renderMainViewCb({ preserveFeedback: true });
 
     const msg = updated.reindexed
-      ? `✓ Settings saved & re-indexed ${updated.reindexed.total_chunks} chunk(s).`
+      ? `✓ Settings saved and re-indexed ${updated.reindexed.total_chunks} chunk${updated.reindexed.total_chunks === 1 ? "" : "s"}.`
       : "✓ Settings saved.";
     showSettingsFeedback(msg, "success", 3200);
   } catch (err) {
@@ -202,7 +224,7 @@ export async function confirmPendingReindex() {
       );
       await selectProfileCb(state.activeProfile.id, { preserveFeedback: true });
       showSettingsFeedback(
-        `✓ Re-indexed ${res.reindexed?.total_chunks ?? 0} chunk(s).`,
+        `✓ Re-indexed ${res.reindexed?.total_chunks ?? 0} chunk${res.reindexed?.total_chunks === 1 ? "" : "s"}.`,
         "success",
         3500
       );
@@ -212,5 +234,41 @@ export async function confirmPendingReindex() {
   } else if (pending.mode === "update_profile") {
     showSettingsFeedback("Re-indexing with new embedding model…", "warning", 0);
     await saveProfilePatch(pending.payload, true);
+  }
+}
+
+export function renderAppSettingsForm() {
+  if (!el.settingEmbeddingDevice) return;
+  const device = state.appSettings?.embedding_device || "cpu";
+  el.settingEmbeddingDevice.value = device === "auto" ? "auto" : "cpu";
+}
+
+function showAppSettingsFeedback(text, variant = "success", autoDismissMs = 3200) {
+  if (!el.appSettingsFeedback) return;
+  if (state.appSettingsFeedbackTimer) {
+    clearTimeout(state.appSettingsFeedbackTimer);
+    state.appSettingsFeedbackTimer = null;
+  }
+  showFeedback(el.appSettingsFeedback, text, variant);
+  if (autoDismissMs > 0) {
+    state.appSettingsFeedbackTimer = setTimeout(() => {
+      el.appSettingsFeedback.hidden = true;
+      state.appSettingsFeedbackTimer = null;
+    }, autoDismissMs);
+  }
+}
+
+export async function saveAppSettings(embeddingDevice) {
+  try {
+    const updated = await apiJson("/api/app-settings", {
+      method: "PUT",
+      body: JSON.stringify({ embedding_device: embeddingDevice }),
+    });
+    state.appSettings = updated;
+    renderAppSettingsForm();
+    showAppSettingsFeedback("✓ Embedding device saved.", "success", 3200);
+  } catch (err) {
+    renderAppSettingsForm();
+    showAppSettingsFeedback(err.message || "Failed to save app settings.", "error", 0);
   }
 }

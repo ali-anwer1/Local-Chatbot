@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-from app.config import AppConfig
+from app.config import AppConfig, AppSettings
 from app.core.availability import ModelAvailabilityManager
 from app.core.backends.base import LLMBackend, models_match
 from app.core.backends.ollama import OllamaBackend
@@ -34,9 +34,18 @@ class ChatbotService:
         backend: LLMBackend | None = None,
     ) -> None:
         self.config = config
-        self.backend: LLMBackend = backend or OllamaBackend(
-            base_url=config.ollama_base_url
-        )
+        self.app_settings = AppSettings.from_config(config)
+        if backend is None:
+            self.backend: LLMBackend = OllamaBackend(
+                base_url=config.ollama_base_url,
+                app_settings=self.app_settings,
+            )
+        else:
+            self.backend = backend
+            if hasattr(self.backend, "bind_app_settings") and getattr(
+                self.backend, "_app_settings", None
+            ) is None:
+                self.backend.bind_app_settings(self.app_settings)
         self.profiles = ProfileManager(
             config.data_dir,
             default_chat_model=config.default_chat_model,
@@ -50,7 +59,20 @@ class ChatbotService:
             availability=self.availability,
         )
 
-    # --- Health & Models ---
+    # --- Health, App Settings & Models ---
+
+    def get_app_settings(self) -> dict[str, Any]:
+        """Return current machine-wide runtime settings."""
+        return self.app_settings.to_dict()
+
+    def list_languages(self) -> list[dict[str, Any]]:
+        """Return the supported languages definition list."""
+        from app.core.languages import SUPPORTED_LANGUAGES
+        return [l.to_dict() for l in SUPPORTED_LANGUAGES]
+
+    def update_app_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Validate and persist machine-wide runtime settings without triggering re-indexing."""
+        return self.app_settings.update(payload)
 
     def startup_check(self) -> dict[str, Any]:
         """Run initial model availability check at startup without crashing (§4.7)."""
@@ -410,6 +432,7 @@ class ChatbotService:
         message: str,
         history: list[dict[str, str]] | None = None,
         runtime_options: dict[str, Any] | None = None,
+        requested_language: str | None = None,
     ) -> Iterator[dict[str, Any]]:
         """Stream RAG chat events using client-supplied conversation history."""
         profile = self.profiles.get_profile(profile_id)
@@ -420,4 +443,102 @@ class ChatbotService:
             history=list(history) if history else [],
             runtime_options=runtime_options,
             documents_overview=docs_overview,
+            requested_language=requested_language,
         )
+
+    # --- Translation (§ Part 2) ---
+
+    def stream_translate(
+        self,
+        *,
+        text: str,
+        target_language: str,
+        source_language: str | None = None,
+        profile_id: str | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        """Stream translation of an answer using the profile's chat model (§ Part 2).
+
+        No retrieval or refusal gate is invoked. Uses temperature 0.1 and think: false.
+        """
+        from app.core.languages import (
+            LANGUAGE_BY_CODE,
+            SUPPORTED_LANGUAGE_CODES,
+            assemble_translation_messages,
+        )
+
+        cleaned_text = text.strip()
+        if not cleaned_text:
+            raise ValidationError("Text to translate cannot be empty.")
+        if target_language not in SUPPORTED_LANGUAGE_CODES:
+            raise ValidationError(f"Target language '{target_language}' is not supported.")
+
+        if profile_id:
+            profile = self.profiles.get_profile(profile_id)
+            chat_model = profile.chat_model
+        else:
+            profiles = self.profiles.list_profiles()
+            chat_model = (
+                profiles[0]["chat_model"]
+                if profiles
+                else self.config.default_chat_model
+            )
+
+        target_entry = LANGUAGE_BY_CODE[target_language]
+        yield {
+            "event": "status",
+            "data": {
+                "label": f"Translating into {target_entry.native_name}…",
+                "target_language": target_language,
+            },
+        }
+
+        messages = assemble_translation_messages(
+            text=cleaned_text,
+            target_language=target_language,
+            source_language=source_language,
+        )
+
+        tokens: list[str] = []
+        for token in self.backend.chat(
+            messages=messages,
+            model=chat_model,
+            options={"temperature": 0.1, "think": False},
+            stream=True,
+        ):
+            tokens.append(token)
+            yield {"event": "token", "data": {"text": token}}
+
+        full_text = "".join(tokens).strip()
+        yield {
+            "event": "done",
+            "data": {
+                "full_text": full_text,
+                "target_language": target_language,
+            },
+        }
+
+    def translate(
+        self,
+        *,
+        text: str,
+        target_language: str,
+        source_language: str | None = None,
+        profile_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Synchronous wrapper for stream_translate for tests and CLI."""
+        tokens: list[str] = []
+        done_data: dict[str, Any] = {}
+        for ev in self.stream_translate(
+            text=text,
+            target_language=target_language,
+            source_language=source_language,
+            profile_id=profile_id,
+        ):
+            if ev["event"] == "token":
+                tokens.append(ev["data"].get("text", ""))
+            elif ev["event"] == "done":
+                done_data = ev["data"]
+        return {
+            "full_text": done_data.get("full_text") or "".join(tokens).strip(),
+            "target_language": done_data.get("target_language", target_language),
+        }

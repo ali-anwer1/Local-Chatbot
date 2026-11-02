@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 import httpx
 
-from app.config import AppConfig
+from app.config import AppConfig, load_config
 from app.core.backends.ollama import OllamaBackend
 from app.core.service import ChatbotService
 from app.main import create_app
@@ -431,3 +431,233 @@ def test_saved_chats_and_retry_history_api_routes(
     del_res = client.delete(f"/api/profiles/{pid}/chats/{chat_id}")
     assert del_res.status_code == 200
     assert client.get(f"/api/profiles/{pid}/chats").json()["chats"] == []
+
+
+def _parse_sse_events(raw_sse: str) -> list[tuple[str, dict]]:
+    events: list[tuple[str, dict]] = []
+    for frame in raw_sse.split("\n\n"):
+        if not frame.strip():
+            continue
+        ev_type = "message"
+        data_lines: list[str] = []
+        for line in frame.splitlines():
+            if line.startswith("event:"):
+                ev_type = line[6:].strip()
+            elif line.startswith("data:"):
+                data_lines.append(line[5:].strip())
+        if data_lines:
+            events.append((ev_type, json.loads("\n".join(data_lines))))
+    return events
+
+
+def test_app_settings_endpoint_validation_and_persistence(
+    tmp_path: Path,
+    mock_backend: DeterministicMockBackend,
+) -> None:
+    """GET/PUT /api/app-settings validates cpu/auto, persists to data/app_settings.json, and overrides config.yaml."""
+    default_cfg = load_config()
+    assert default_cfg.embedding_device == "cpu"
+    assert default_cfg.keep_alive == "30m"
+
+    cfg = AppConfig(
+        data_dir=tmp_path / "data_appsettings",
+        embedding_device="cpu",
+        keep_alive="25m",
+    )
+    svc1 = ChatbotService(config=cfg, backend=mock_backend)
+    client1 = TestClient(create_app(svc1))
+
+    initial = client1.get("/api/app-settings")
+    assert initial.status_code == 200
+    assert initial.json() == {"embedding_device": "cpu", "keep_alive": "25m"}
+
+    # Reject any value other than 'cpu' or 'auto'
+    for bad_payload in (
+        {"embedding_device": "gpu"},
+        {"embedding_device": "cuda"},
+        {"embedding_device": "CPU"},
+        {"embedding_device": ""},
+        {"embedding_device": 0},
+        {},
+    ):
+        bad_res = client1.put("/api/app-settings", json=bad_payload)
+        assert bad_res.status_code == 422
+        assert bad_res.json()["code"] == "validation_error"
+
+    assert client1.get("/api/app-settings").json()["embedding_device"] == "cpu"
+
+    # Valid update persists to data/app_settings.json without mutating frozen AppConfig
+    updated = client1.put("/api/app-settings", json={"embedding_device": "auto"})
+    assert updated.status_code == 200
+    assert updated.json() == {"embedding_device": "auto", "keep_alive": "25m"}
+    assert cfg.embedding_device == "cpu"
+
+    settings_file = cfg.data_dir / "app_settings.json"
+    assert settings_file.exists()
+    assert json.loads(settings_file.read_text(encoding="utf-8")) == {
+        "embedding_device": "auto"
+    }
+
+    # Simulated restart loads data/app_settings.json over config.yaml's default
+    svc2 = ChatbotService(config=cfg, backend=mock_backend)
+    client2 = TestClient(create_app(svc2))
+    assert client2.get("/api/app-settings").json()["embedding_device"] == "auto"
+
+
+def test_embed_device_cpu_vs_auto_keep_alive_and_done_timings(
+    tmp_path: Path,
+) -> None:
+    """Verify num_gpu=0 on cpu, omitted on auto, keep_alive on chat & embed, no reindex on switch, and done timings."""
+    embed_payloads: list[dict] = []
+    chat_payloads: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {"name": "qwen3.5:4b", "size": 2700000000, "digest": "d1"},
+                        {"name": "nomic-embed-text:latest", "size": 274000000, "digest": "d2"},
+                    ]
+                },
+            )
+        if request.url.path == "/api/show":
+            body = json.loads(request.content.decode("utf-8"))
+            caps = (
+                ["embedding"]
+                if "embed" in body["model"]
+                else ["completion", "thinking"]
+            )
+            return httpx.Response(200, json={"capabilities": caps})
+        if request.url.path == "/api/embed":
+            payload = json.loads(request.content.decode("utf-8"))
+            embed_payloads.append(payload)
+            inputs = payload["input"]
+            vecs = []
+            for text in inputs:
+                if "warranty" in text.lower() or "36-month" in text.lower():
+                    vecs.append([1.0, 0.0, 0.0])
+                else:
+                    vecs.append([0.0, 1.0, 0.0])
+            return httpx.Response(200, json={"embeddings": vecs})
+        if request.url.path == "/api/chat":
+            payload = json.loads(request.content.decode("utf-8"))
+            chat_payloads.append(payload)
+            ndjson = "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "message": {"role": "assistant", "content": "Standard warranty is 36 months "},
+                            "done": False,
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "message": {"role": "assistant", "content": "[1]."},
+                            "done": False,
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "message": {"role": "assistant", "content": ""},
+                            "done": True,
+                            "prompt_eval_count": 320,
+                            "prompt_eval_duration": 400_000_000,
+                            "eval_count": 50,
+                            "eval_duration": 1_000_000_000,
+                        }
+                    ),
+                ]
+            )
+            return httpx.Response(
+                200,
+                content=ndjson.encode("utf-8"),
+                headers={"Content-Type": "application/x-ndjson"},
+            )
+        return httpx.Response(404)
+
+    cfg = AppConfig(
+        data_dir=tmp_path / "data_perf",
+        embedding_device="cpu",
+        keep_alive="30m",
+    )
+    ollama = OllamaBackend(transport=httpx.MockTransport(handler))
+    svc = ChatbotService(config=cfg, backend=ollama)
+    client = TestClient(create_app(svc))
+
+    prof = client.post("/api/profiles", json={"name": "Perf Bot"}).json()
+    pid = prof["id"]
+
+    # 1. Ingestion with embedding_device == 'cpu' -> options.num_gpu == 0 & keep_alive == '30m'
+    up_res = client.post(
+        f"/api/profiles/{pid}/documents",
+        files={"file": ("warranty.txt", b"Standard warranty is 36-month coverage.", "text/plain")},
+    )
+    assert up_res.status_code == 201
+    assert len(embed_payloads) == 1
+    assert embed_payloads[-1]["options"] == {"num_gpu": 0}
+    assert embed_payloads[-1]["keep_alive"] == "30m"
+
+    # 2. Query with embedding_device == 'cpu' -> embed has num_gpu == 0, chat has keep_alive == '30m', done has timings
+    chat_res = client.post(
+        f"/api/profiles/{pid}/chat",
+        json={"message": "What is the 36-month warranty?"},
+    )
+    assert chat_res.status_code == 200
+    assert embed_payloads[-1]["options"] == {"num_gpu": 0}
+    assert embed_payloads[-1]["keep_alive"] == "30m"
+    assert chat_payloads[-1]["keep_alive"] == "30m"
+
+    events = _parse_sse_events(chat_res.text)
+    done_events = [data for ev, data in events if ev == "done"]
+    assert len(done_events) == 1
+    timings = done_events[0]["timings"]
+    assert isinstance(timings["embed_ms"], float) and timings["embed_ms"] >= 0.0
+    assert isinstance(timings["retrieval_ms"], float) and timings["retrieval_ms"] >= 0.0
+    assert (
+        isinstance(timings["time_to_first_token_ms"], float)
+        and timings["time_to_first_token_ms"] >= 0.0
+    )
+    assert (
+        isinstance(timings["total_ms"], float)
+        and timings["total_ms"] >= timings["time_to_first_token_ms"]
+    )
+    assert timings["prompt_eval_count"] == 320
+    assert timings["prompt_eval_duration"] == 400_000_000
+    assert timings["prompt_eval_ms"] == 400.0
+    assert timings["eval_count"] == 50
+    assert timings["eval_duration"] == 1_000_000_000
+    assert timings["eval_ms"] == 1000.0
+    assert timings["tokens_per_second"] == 50.0
+
+    # 3. Switch device to 'auto' -> does NOT trigger re-index; next embed omits num_gpu
+    embeds_before_switch = len(embed_payloads)
+    switch_res = client.put("/api/app-settings", json={"embedding_device": "auto"})
+    assert switch_res.status_code == 200
+    assert len(embed_payloads) == embeds_before_switch  # No re-index triggered
+
+    chat_res_auto = client.post(
+        f"/api/profiles/{pid}/chat",
+        json={"message": "What is the 36-month warranty?"},
+    )
+    assert chat_res_auto.status_code == 200
+    assert "num_gpu" not in embed_payloads[-1].get("options", {})
+    assert "options" not in embed_payloads[-1]
+    assert embed_payloads[-1]["keep_alive"] == "30m"
+
+    # 4. Out-of-scope refusal query records embed/retrieval/total timings without leaking prior Ollama chat stats
+    refused_res = client.post(
+        f"/api/profiles/{pid}/chat",
+        json={"message": "How do I bake sourdough bread?"},
+    )
+    assert refused_res.status_code == 200
+    refused_done = [d for ev, d in _parse_sse_events(refused_res.text) if ev == "done"][0]
+    assert refused_done["refused"] is True
+    refused_timings = refused_done["timings"]
+    assert isinstance(refused_timings["embed_ms"], float)
+    assert isinstance(refused_timings["retrieval_ms"], float)
+    assert refused_timings["time_to_first_token_ms"] is None
+    assert isinstance(refused_timings["total_ms"], float)
+    assert "eval_count" not in refused_timings
+    assert "prompt_eval_count" not in refused_timings

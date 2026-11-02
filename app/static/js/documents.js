@@ -20,8 +20,8 @@ export function renderDocumentSummaryAndModal() {
     docs.reduce((acc, d) => acc + (d.chunk_count || 0), 0);
 
   el.docsSummaryBadge.textContent = `${docs.length} file${docs.length === 1 ? "" : "s"}`;
-  el.kbCardHeadline.textContent = `${indexedDocs.length} Indexed Document${indexedDocs.length === 1 ? "" : "s"}`;
-  el.kbCardSubline.textContent = `${totalChunks} vector chunk${totalChunks === 1 ? "" : "s"} · PDF, DOCX, MD, TXT`;
+  el.kbCardHeadline.textContent = `${indexedDocs.length} indexed document${indexedDocs.length === 1 ? "" : "s"}`;
+  el.kbCardSubline.textContent = `${totalChunks} chunk${totalChunks === 1 ? "" : "s"} · PDF, DOCX, MD, TXT`;
 
   if (warnDocs.length > 0) {
     el.kbWarningPill.textContent = `${warnDocs.length} warning${warnDocs.length === 1 ? "" : "s"}`;
@@ -31,9 +31,9 @@ export function renderDocumentSummaryAndModal() {
   }
 
   el.btnOpenDocsLabel.textContent =
-    docs.length > 0 ? `Manage Files (${docs.length})` : "View Files";
+    docs.length > 0 ? `Manage files (${docs.length})` : "View files";
 
-  // Compact preview: show at most the 3 most recent documents so the sidebar never gets crowded
+  // Compact preview: show at most the 3 most recent documents
   el.documentPreviewList.innerHTML = "";
   if (docs.length === 0) {
     el.documentPreviewList.hidden = true;
@@ -62,7 +62,7 @@ export function renderDocumentSummaryAndModal() {
     if (docs.length > 3) {
       const moreLi = document.createElement("li");
       moreLi.className = "helper-text";
-      moreLi.textContent = `+ ${docs.length - 3} more file(s) in document manager`;
+      moreLi.textContent = `+ ${docs.length - 3} more in document manager`;
       el.documentPreviewList.appendChild(moreLi);
     }
   }
@@ -90,7 +90,7 @@ export function renderDocsModalList() {
     state.activeProfile?.total_chunks ??
     docs.reduce((acc, d) => acc + (d.chunk_count || 0), 0);
 
-  el.docsModalTitle.textContent = `${profName} — Knowledge Base`;
+  el.docsModalTitle.textContent = `${profName} — Knowledge base`;
   el.docsModalSubtitle.textContent = `${docs.length} document${docs.length === 1 ? "" : "s"} · ${totalChunks} indexed chunk${totalChunks === 1 ? "" : "s"}`;
 
   const query = state.docSearchQuery.trim().toLowerCase();
@@ -113,7 +113,7 @@ export function renderDocsModalList() {
     empty.className = "docs-empty-state";
     empty.textContent =
       docs.length === 0
-        ? "No documents uploaded yet. Click 'Upload Files…' above to add PDF, DOCX, Markdown, or TXT files."
+        ? "No documents uploaded yet. Click 'Upload files…' above to add PDF, DOCX, Markdown, or TXT files."
         : "No documents match your current search or filter.";
     el.modalDocumentList.appendChild(empty);
     return;
@@ -147,7 +147,7 @@ export function renderDocsModalList() {
       meta.textContent = `Warning: ${doc.warning || "likely scanned PDF, unsupported"} · ${sizeStr}`;
     } else {
       meta.className = "modal-doc-meta";
-      meta.textContent = `Indexed · ${doc.chunk_count} chunk(s) · ${sizeStr}${dateStr ? ` · Uploaded ${dateStr}` : ""}`;
+      meta.textContent = `Indexed · ${doc.chunk_count} chunk${doc.chunk_count === 1 ? "" : "s"} · ${sizeStr}${dateStr ? ` · Uploaded ${dateStr}` : ""}`;
     }
     info.appendChild(meta);
     main.appendChild(info);

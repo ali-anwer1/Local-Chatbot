@@ -5,9 +5,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 import json
+import threading
 from typing import Any
 import httpx
 
+from app.config import VALID_EMBEDDING_DEVICES, AppSettings
 from app.core.backends.base import (
     LLMBackend,
     format_bytes,
@@ -52,6 +54,12 @@ NETWORK_ERROR_INDICATORS = (
 )
 
 EMBED_BATCH_SIZE = 32
+OLLAMA_CHAT_STAT_KEYS = (
+    "prompt_eval_count",
+    "prompt_eval_duration",
+    "eval_count",
+    "eval_duration",
+)
 
 
 class OllamaBackend(LLMBackend):
@@ -63,14 +71,73 @@ class OllamaBackend(LLMBackend):
         timeout_seconds: float = 120.0,
         connect_timeout_seconds: float = 5.0,
         transport: httpx.BaseTransport | None = None,
+        *,
+        embedding_device: str = "cpu",
+        keep_alive: str = "30m",
+        app_settings: AppSettings | None = None,
     ) -> None:
+        if embedding_device not in VALID_EMBEDDING_DEVICES:
+            raise ValueError(
+                f"Invalid embedding_device '{embedding_device}'. Must be 'cpu' or 'auto'."
+            )
         self.base_url = base_url.rstrip("/")
         self.timeout = httpx.Timeout(timeout_seconds, connect=connect_timeout_seconds)
         self._transport = transport
+        self._embedding_device = embedding_device
+        self._keep_alive = keep_alive
+        self._app_settings = app_settings
+        self._thread_local = threading.local()
+        self._last_chat_stats: dict[str, Any] | None = None
         # Cache /api/show metadata keyed by (model_name, digest) to avoid redundant calls
         self._show_cache: dict[tuple[str, str], dict[str, Any]] = {}
         # Cache raw capabilities per model name so chat() knows if 'thinking' is present
         self._raw_capabilities: dict[str, set[str]] = {}
+
+    def bind_app_settings(self, app_settings: AppSettings) -> None:
+        """Bind a shared mutable AppSettings holder so runtime setting changes take effect immediately."""
+        self._app_settings = app_settings
+
+    @property
+    def embedding_device(self) -> str:
+        if self._app_settings is not None:
+            return self._app_settings.embedding_device
+        return self._embedding_device
+
+    @embedding_device.setter
+    def embedding_device(self, value: str) -> None:
+        if value not in VALID_EMBEDDING_DEVICES:
+            raise ValueError(
+                f"Invalid embedding_device '{value}'. Must be 'cpu' or 'auto'."
+            )
+        self._embedding_device = value
+        if self._app_settings is not None:
+            self._app_settings.update({"embedding_device": value})
+
+    @property
+    def keep_alive(self) -> str:
+        if self._app_settings is not None:
+            return self._app_settings.keep_alive
+        return self._keep_alive
+
+    @keep_alive.setter
+    def keep_alive(self, value: str) -> None:
+        self._keep_alive = value
+
+    def _set_last_chat_stats(self, stats: dict[str, Any] | None) -> None:
+        self._thread_local.last_chat_stats = stats
+        self._last_chat_stats = stats
+
+    def _record_chat_stats(self, chunk: dict[str, Any]) -> None:
+        stats: dict[str, int] = {}
+        for key in OLLAMA_CHAT_STAT_KEYS:
+            val = chunk.get(key)
+            if isinstance(val, (int, float)) and not isinstance(val, bool):
+                stats[key] = int(val)
+        self._set_last_chat_stats(stats if stats else None)
+
+    def get_last_chat_stats(self) -> dict[str, Any] | None:
+        stats = getattr(self._thread_local, "last_chat_stats", self._last_chat_stats)
+        return dict(stats) if isinstance(stats, dict) else None
 
     def _client(self, timeout: httpx.Timeout | None = None) -> httpx.Client:
         return httpx.Client(
@@ -256,11 +323,13 @@ class OllamaBackend(LLMBackend):
         stream: bool = True,
     ) -> Iterator[str]:
         """Call Ollama /api/chat and yield response text tokens."""
+        self._set_last_chat_stats(None)
         runtime_options = self._build_runtime_options(options)
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "stream": stream,
+            "keep_alive": self.keep_alive,
         }
         if runtime_options:
             payload["options"] = runtime_options
@@ -297,6 +366,8 @@ class OllamaBackend(LLMBackend):
             data = resp.json()
             if isinstance(data, dict) and data.get("error"):
                 raise self._classify_chat_error(model, 500, str(data["error"]))
+            if isinstance(data, dict):
+                self._record_chat_stats(data)
             msg = data.get("message", {}) if isinstance(data, dict) else {}
             content = str(msg.get("content") or "")
             if content:
@@ -328,12 +399,15 @@ class OllamaBackend(LLMBackend):
                         continue
                     if chunk.get("error"):
                         raise self._classify_chat_error(model, 500, str(chunk["error"]))
+                    is_done = bool(chunk.get("done"))
+                    if is_done:
+                        self._record_chat_stats(chunk)
                     msg = chunk.get("message")
                     if isinstance(msg, dict):
                         token = msg.get("content")
                         if token:
                             yield str(token)
-                    if chunk.get("done"):
+                    if is_done:
                         break
 
     def embed(self, texts: list[str], model: str) -> list[list[float]]:
@@ -341,13 +415,22 @@ class OllamaBackend(LLMBackend):
         if not texts:
             return []
 
+        device = self.embedding_device
+        keep_alive = self.keep_alive
         all_vectors: list[list[float]] = []
         with self._translate_http_errors(model=model), self._client() as client:
             for start in range(0, len(texts), EMBED_BATCH_SIZE):
                 batch = texts[start : start + EMBED_BATCH_SIZE]
+                embed_payload: dict[str, Any] = {
+                    "model": model,
+                    "input": batch,
+                    "keep_alive": keep_alive,
+                }
+                if device == "cpu":
+                    embed_payload["options"] = {"num_gpu": 0}
                 resp = client.post(
                     "/api/embed",
-                    json={"model": model, "input": batch},
+                    json=embed_payload,
                 )
                 if resp.status_code >= 400:
                     err = self._extract_error_message(resp)

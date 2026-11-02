@@ -1,0 +1,126 @@
+{
+  "profile": {
+    "name": "Pembantu Teknikal Astra NX-200",
+    "preamble": "Anda adalah pembantu kejuruteraan perkakasan dan sokongan lapangan dalaman untuk Astra NX-200 Industrial Edge Gateway. Berikan jawapan teknikal yang tepat dan ringkas hanya daripada dokumentasi yang disediakan dan sentiasa petik petikan sumber anda."
+  },
+  "questions": [
+    {
+      "id": "in_01",
+      "category": "in_scope",
+      "question": "Apakah pemproses, RAM, dan storan kilat onboard yang didatangkan standard dalam Astra NX-200?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_datasheet.pdf",
+      "expected_page": 1,
+      "expected_keywords": ["Cortex-A78AE", "8 GB", "64 GB"]
+    },
+    {
+      "id": "in_02",
+      "category": "in_scope",
+      "question": "Berapakah julat voltan input DC yang boleh diterima dan penggunaan kuasa puncak bagi NX-200?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_datasheet.pdf",
+      "expected_page": 2,
+      "expected_keywords": ["12 V", "48 V", "34 W"]
+    },
+    {
+      "id": "in_03",
+      "category": "in_scope",
+      "question": "Berapakah kuasa PoE+ yang boleh dibekalkan oleh port ETH1, dan apakah penarafan pengasingan galvanik untuk port bersiri?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_datasheet.pdf",
+      "expected_page": 3,
+      "expected_keywords": ["25.5 W", "2.5 kVrms"]
+    },
+    {
+      "id": "in_04",
+      "category": "in_scope",
+      "question": "Berapa kerapkah bateri sandaran RTC mesti diganti semasa penyelenggaraan pencegahan, dan model bateri manakah yang ditentukan?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_maintenance_sop.docx",
+      "expected_keywords": ["36", "CR2032W"]
+    },
+    {
+      "id": "in_05",
+      "category": "in_scope",
+      "question": "Apakah kit ganti, ketebalan pad, dan tork pengikat M3 yang diperlukan semasa menggantikan pad antara muka terma?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_maintenance_sop.docx",
+      "expected_keywords": ["AST-TPAD-15", "1.5 mm", "0.65"]
+    },
+    {
+      "id": "in_06",
+      "category": "in_scope",
+      "question": "Bagaimanakah cara untuk memasuki Mod Pemulihan Perisian Tegar pada NX-200, dan apakah IP statik serta port konsol pemulihan?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_nx200_maintenance_sop.docx",
+      "expected_keywords": ["192.168.200.1", "8443"]
+    },
+    {
+      "id": "in_07",
+      "category": "in_scope",
+      "question": "Berapa lamakah waranti perkakasan standard, dan berapa lamakah AstraCare Plus melanjutkan perlindungan?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_warranty_and_sla.md",
+      "expected_keywords": ["36", "60"]
+    },
+    {
+      "id": "in_08",
+      "category": "in_scope",
+      "question": "Apakah SLA masa tindak balas kejuruteraan P1, dan dalam tempoh berapa harikah unit RMA yang rosak mesti dipulangkan?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_warranty_and_sla.md",
+      "expected_keywords": ["14"]
+    },
+    {
+      "id": "in_09",
+      "category": "in_scope",
+      "question": "Apakah maksud corak kelipan LED STAT merah dan ambar berselang-seli pada Astra NX-200?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_field_faq.txt",
+      "expected_keywords": ["TPM", "E-409"]
+    },
+    {
+      "id": "in_10",
+      "category": "in_scope",
+      "question": "Berapakah kelegaan aliran udara menegak yang diperlukan di atas dan di bawah heatsink NX-200 pada rel DIN?",
+      "expected_refusal": false,
+      "expected_source_file": "astra_field_faq.txt",
+      "expected_keywords": ["35 mm"]
+    },
+    {
+      "id": "out_01",
+      "category": "out_of_scope",
+      "question": "Apakah ibu negara Perancis dan jumlah penduduk semasanya?",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_02",
+      "category": "out_of_scope",
+      "question": "Tulis fungsi Python yang melaksanakan algoritma quicksort.",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_03",
+      "category": "out_of_scope",
+      "question": "Berapa harikah cuti tahunan bergaji yang diterima oleh pekerja sepenuh masa di bawah polisi HR?",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_04",
+      "category": "out_of_scope",
+      "question": "Apakah resipi dan suhu membakar untuk roti artisan sourdough?",
+      "expected_refusal": true,
+      "expected_keywords": []
+    },
+    {
+      "id": "out_05",
+      "category": "out_of_scope",
+      "question": "Apakah simbol ticker saham dan perolehan Q3 bagi NVIDIA?",
+      "expected_refusal": true,
+      "expected_keywords": []
+    }
+  ]
+}

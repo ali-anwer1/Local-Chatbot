@@ -119,7 +119,7 @@ export function showFeedback(targetEl, text, variant = "success") {
   targetEl.hidden = false;
 }
 
-// Auto-dismissing Settings Save Toast (#8)
+// Auto-dismissing Settings Save Feedback (#8)
 export function showSettingsFeedback(text, variant = "success", autoDismissMs = 3200) {
   if (state.settingsFeedbackTimer) {
     clearTimeout(state.settingsFeedbackTimer);
@@ -145,9 +145,11 @@ export function setLeftSidebarCollapsed(collapsed) {
 
 export function syncSidebarToggleVisibility() {
   const collapsed = state.leftSidebarCollapsed;
-  el.btnOpenLeftSidebar.hidden = !collapsed;
-  el.btnHeaderNewChat.hidden = !collapsed;
-  el.emptyStageTopbar.hidden = !(collapsed && el.chatWorkspace.hidden);
+  if (el.btnOpenLeftSidebar) el.btnOpenLeftSidebar.hidden = !collapsed;
+  if (el.btnHeaderNewChat) el.btnHeaderNewChat.hidden = !collapsed;
+  if (el.emptyStageTopbar) {
+    el.emptyStageTopbar.hidden = !(collapsed && el.chatWorkspace.hidden);
+  }
 }
 
 export function setSettingsPanelOpen(open) {
@@ -155,8 +157,8 @@ export function setSettingsPanelOpen(open) {
   el.appLayout.classList.toggle("settings-collapsed", !state.settingsPanelOpen);
   el.btnToggleSettings.setAttribute("aria-expanded", String(state.settingsPanelOpen));
   el.btnToggleSettings.title = state.settingsPanelOpen
-    ? "Close Settings & Knowledge Base"
-    : "Open Settings & Knowledge Base";
+    ? "Close settings"
+    : "Open settings";
 }
 
 // --- Thinking Mode Helpers (#3) ---
@@ -175,7 +177,7 @@ export function setThinkingEnabled(profileId, enabled) {
     state.thinkingByProfile.set(profileId, val);
   }
   el.btnThinkingToggle.setAttribute("aria-pressed", String(val));
-  el.thinkingPillLabel.textContent = val ? "Thinking: On" : "Thinking: Off";
+  el.thinkingPillLabel.textContent = val ? "Thinking on" : "Thinking off";
   el.settingThinking.checked = val;
 }
 

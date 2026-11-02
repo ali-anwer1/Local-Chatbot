@@ -99,3 +99,7 @@ class LLMBackend(ABC):
     @abstractmethod
     def pull_model(self, model: str) -> Iterator[dict[str, Any]]:
         """Download a model with streaming progress events (user-initiated only)."""
+
+    def get_last_chat_stats(self) -> dict[str, Any] | None:
+        """Return token and duration stats from the most recent chat() call, if available."""
+        return getattr(self, "_last_chat_stats", None)

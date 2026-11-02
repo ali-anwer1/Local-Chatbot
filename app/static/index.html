@@ -4,39 +4,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <title>Local RAG Chatbot</title>
-  <link rel="stylesheet" href="/static/styles.css?v=1.1.1">
+  <title>Local RAG</title>
+  <link rel="stylesheet" href="/static/styles.css?v=2.0.0">
 </head>
 <body>
   <!-- Global Ollama Unreachable Banner (§4.7 row 1) -->
   <div id="global-ollama-banner" class="system-banner danger" role="alert" hidden>
     <div class="banner-content">
-      <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
       </svg>
       <span id="global-ollama-banner-text">Ollama is not reachable. Start Ollama and click Retry.</span>
     </div>
     <button type="button" id="btn-retry-ollama" class="btn small">Retry</button>
   </div>
 
-  <!-- Right- panel closed by default (.settings-collapsed); left sidebar open by default -->
+  <!-- Right panel closed by default (.settings-collapsed); left sidebar open by default -->
   <div class="app-layout settings-collapsed">
-    <!-- Left Sidebar: Profiles, Saved Chats & Status -->
+    <!-- Left Sidebar: Profiles, Saved chats & Ollama status -->
     <aside id="left-sidebar" class="sidebar" aria-label="Profiles and saved chats">
       <header class="sidebar-header">
         <div class="sidebar-top-row">
-          <div class="brand-row">
-            <div class="brand-mark" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 2a.75.75 0 01.67.415l1.882 3.765 4.155.604a.75.75 0 01.416 1.279l-3.007 2.93.71 4.139a.75.75 0 01-1.088.791L10 13.97l-3.738 1.953a.75.75 0 01-1.088-.79l.71-4.14-3.007-2.93a.75.75 0 01.416-1.28l4.155-.603L9.33 2.415A.75.75 0 0110 2z"/>
-              </svg>
-            </div>
-            <div>
-              <h1>Local RAG</h1>
-              <p class="brand-subtitle">Private Knowledge AI</p>
-            </div>
-          </div>
-
+          <h1 class="brand-wordmark">Local RAG</h1>
           <button
             type="button"
             id="btn-close-left-sidebar"
@@ -46,47 +37,41 @@
             aria-expanded="true"
             aria-controls="left-sidebar"
           >
-            <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
-              <rect x="2.75" y="3.5" width="14.5" height="13" rx="2.25"/>
-              <line x1="7.5" y1="3.5" x2="7.5" y2="16.5"/>
-              <path d="M12.75 8l-2 2 2 2" stroke-linecap="round" stroke-linejoin="round"/>
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M9 3v18"/>
+              <path d="m16 15-3-3 3-3"/>
             </svg>
           </button>
         </div>
-
-        <button type="button" id="btn-sidebar-new-chat" class="btn new-chat-btn full-width">
-          <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/>
-          </svg>
-          <span>New Chat</span>
-        </button>
       </header>
 
       <div class="sidebar-scroll">
-        <!-- Bot Profiles Section -->
-        <nav class="sidebar-section" aria-label="Bot profiles">
+        <!-- Profiles Section -->
+        <nav class="sidebar-section" aria-label="Profiles">
           <div class="sidebar-section-header">
-            <h2 class="section-eyebrow">Bot Profiles</h2>
+            <h2 class="section-heading">Profiles</h2>
             <button
               type="button"
               id="btn-new-profile"
               class="icon-btn tiny"
-              title="Create new bot profile"
-              aria-label="Create new bot profile"
+              title="New profile"
+              aria-label="Create profile"
             >
-              <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14"/>
+                <path d="M12 5v14"/>
               </svg>
             </button>
           </div>
           <ul id="profile-list" class="profile-list"></ul>
         </nav>
 
-        <!-- Saved Chats Section (scoped to active profile) -->
+        <!-- Saved chats Section (scoped to active profile) -->
         <nav id="saved-chats-section" class="sidebar-section" aria-label="Saved chats">
           <div class="sidebar-section-header">
-            <h2 class="section-eyebrow">Saved Chats</h2>
-            <span id="saved-chats-count" class="eyebrow-count">0</span>
+            <h2 class="section-heading">Saved chats</h2>
+            <span id="saved-chats-count" class="section-count">0</span>
           </div>
           <ul id="saved-chat-list" class="saved-chat-list"></ul>
         </nav>
@@ -97,12 +82,13 @@
           <span class="status-dot" aria-hidden="true"></span>
           <span id="ollama-status-text">Checking Ollama…</span>
         </div>
-        <button type="button" id="btn-open-pull-modal" class="btn subtle small full-width">
-          <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z"/>
-            <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/>
+        <button type="button" id="btn-open-pull-modal" class="text-action-btn">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
-          <span>Download Model…</span>
+          <span>Download model…</span>
         </button>
       </footer>
     </aside>
@@ -118,10 +104,10 @@
           title="Open sidebar"
           aria-label="Open left sidebar"
         >
-          <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
-            <rect x="2.75" y="3.5" width="14.5" height="13" rx="2.25"/>
-            <line x1="7.5" y1="3.5" x2="7.5" y2="16.5"/>
-            <path d="M10.75 8l2 2-2 2" stroke-linecap="round" stroke-linejoin="round"/>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M9 3v18"/>
+            <path d="m14 9 3 3-3 3"/>
           </svg>
         </button>
       </div>
@@ -129,11 +115,11 @@
       <!-- First-Run Screen when 0 models are installed (§4.7 row 2) -->
       <section id="first-run-screen" class="first-run-card" hidden>
         <div class="first-run-inner">
-          <h2>First-Time Model Setup Required</h2>
-          <p>Ollama is running locally, but no models are installed yet. Run these commands in a terminal (or download directly below), then click <strong>Retry</strong>:</p>
+          <h2>Model setup required</h2>
+          <p>Ollama is running locally, but no models are installed yet. Run these commands in a terminal or download directly below, then click <strong>Retry</strong>:</p>
           <div id="recommended-commands-list" class="command-list"></div>
           <div class="first-run-actions">
-            <button type="button" id="btn-first-run-retry" class="btn primary">Retry Model Check</button>
+            <button type="button" id="btn-first-run-retry" class="btn primary">Retry model check</button>
           </div>
         </div>
       </section>
@@ -141,14 +127,11 @@
       <!-- Empty State when no profiles exist yet -->
       <section id="no-profile-screen" class="empty-workspace" hidden>
         <div class="empty-card">
-          <div class="welcome-orb" aria-hidden="true">
-            <svg class="icon-lg" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2.25a.75.75 0 01.67.415l2.29 4.582 5.057.735a.75.75 0 01.416 1.279l-3.66 3.567.864 5.037a.75.75 0 01-1.088.791L12 16.277l-4.549 2.379a.75.75 0 01-1.088-.79l.864-5.038-3.66-3.567a.75.75 0 01.416-1.28l5.057-.734 2.29-4.582A.75.75 0 0112 2.25z"/>
-            </svg>
+          <h2>No profiles yet</h2>
+          <p>Each profile pairs a system preamble and model selection with an isolated document index.</p>
+          <div>
+            <button type="button" id="btn-empty-new-profile" class="btn primary">Create profile</button>
           </div>
-          <h2>Create Your First Bot Profile</h2>
-          <p>Each bot profile pairs a custom persona with its own isolated local knowledge base (PDF, DOCX, Markdown, TXT) running 100% on your machine.</p>
-          <button type="button" id="btn-empty-new-profile" class="btn primary">Create Bot Profile</button>
         </div>
       </section>
 
@@ -164,41 +147,27 @@
               aria-label="Open left sidebar"
               hidden
             >
-              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
-                <rect x="2.75" y="3.5" width="14.5" height="13" rx="2.25"/>
-                <line x1="7.5" y1="3.5" x2="7.5" y2="16.5"/>
-                <path d="M10.75 8l2 2-2 2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-
-            <button
-              type="button"
-              id="btn-header-new-chat"
-              class="icon-btn"
-              title="New chat"
-              aria-label="Start new chat"
-              hidden
-            >
-              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                <path d="M10 4.5v11M4.5 10h11" stroke-linecap="round"/>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M9 3v18"/>
+                <path d="m14 9 3 3-3 3"/>
               </svg>
             </button>
 
             <div class="chat-title-group">
-              <div class="title-line">
-                <h2 id="active-profile-title">Profile</h2>
-                <span id="active-chat-badge" class="saved-indicator" hidden>Saved</span>
-              </div>
-              <div class="chat-meta-pills">
-                <span id="active-model-badge" class="meta-chip" aria-live="polite">Model: —</span>
+              <h2 id="active-profile-title">Profile</h2>
+              <div class="chat-header-meta">
+                <span id="active-model-badge" class="meta-mono" aria-live="polite">—</span>
+                <span class="meta-sep" aria-hidden="true">·</span>
                 <button
                   type="button"
                   id="btn-kb-pill"
-                  class="meta-chip clickable"
-                  title="View uploaded knowledge base documents"
+                  class="meta-link-btn"
+                  title="Manage knowledge base documents"
                 >
                   <span id="active-kb-badge">0 docs · 0 chunks</span>
                 </button>
+                <span id="active-chat-badge" class="saved-indicator" hidden>Saved</span>
               </div>
             </div>
           </div>
@@ -206,60 +175,80 @@
           <div class="chat-toolbar">
             <button
               type="button"
-              id="btn-save-chat"
-              class="btn subtle small"
-              title="Save conversation to this profile"
-              disabled
-            >
-              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
-                <path d="M5.5 3.5h9a1.5 1.5 0 011.5 1.5v11.5l-6-3.25-6 3.25V5a1.5 1.5 0 011.5-1.5z" stroke-linejoin="round"/>
-              </svg>
-              <span id="btn-save-chat-label">Save Chat</span>
-            </button>
-
-            <button
-              type="button"
-              id="btn-export-chat"
-              class="btn subtle small"
-              title="Export conversation as Markdown (.md)"
-              disabled
-            >
-              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
-                <path d="M10 3.5v8.5m0 0l-3-3m3 3l3-3M4 13.5v1.75A1.25 1.25 0 005.25 16.5h9.5A1.25 1.25 0 0016 15.25V13.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span>Export</span>
-            </button>
-
-            <button
-              type="button"
               id="btn-clear-chat"
               class="btn subtle small"
-              title="Start a fresh conversation"
+              title="Start a new chat"
             >
-              New Chat
+              New chat
             </button>
 
-            <label class="toggle-control" for="toggle-debug" title="Show similarity scores and candidate chunks">
-              <input type="checkbox" id="toggle-debug">
-              <span>Debug</span>
-            </label>
+            <button
+              type="button"
+              id="btn-overflow-menu"
+              class="icon-btn"
+              title="More actions"
+              aria-label="More conversation actions"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              commandfor="chat-overflow-menu"
+              command="toggle-popover"
+            >
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="1"/>
+                <circle cx="19" cy="12" r="1"/>
+                <circle cx="5" cy="12" r="1"/>
+              </svg>
+            </button>
+            <div id="chat-overflow-menu" class="overflow-menu" popover="auto">
+              <div class="overflow-menu-list" focusgroup="menu nomemory" aria-labelledby="btn-overflow-menu">
+                <button
+                  type="button"
+                  id="btn-save-chat"
+                  class="menu-item"
+                  disabled
+                >
+                  <span id="btn-save-chat-label">Save chat</span>
+                </button>
+                <button
+                  type="button"
+                  id="btn-export-chat"
+                  class="menu-item"
+                  disabled
+                >
+                  <span>Export as Markdown</span>
+                </button>
+                <hr>
+                <button
+                  type="button"
+                  id="toggle-debug"
+                  class="menu-item"
+                  role="menuitemcheckbox"
+                  aria-checked="false"
+                >
+                  <span>Debug view</span>
+                </button>
+              </div>
+            </div>
 
             <button
               type="button"
               id="btn-toggle-settings"
               class="icon-btn settings-trigger"
-              title="Settings &amp; Knowledge Base"
-              aria-label="Toggle Settings and Knowledge Base panel"
+              title="Open settings"
+              aria-label="Toggle settings panel"
               aria-expanded="false"
               aria-controls="settings-panel"
             >
-              <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
-                <line x1="3" y1="5.5" x2="17" y2="5.5" stroke-linecap="round"/>
-                <circle cx="7" cy="5.5" r="2" fill="var(--bg-surface)"/>
-                <line x1="3" y1="10" x2="17" y2="10" stroke-linecap="round"/>
-                <circle cx="13" cy="10" r="2" fill="var(--bg-surface)"/>
-                <line x1="3" y1="14.5" x2="17" y2="14.5" stroke-linecap="round"/>
-                <circle cx="8.5" cy="14.5" r="2" fill="var(--bg-surface)"/>
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="21" x2="14" y1="4" y2="4"/>
+                <line x1="10" x2="3" y1="4" y2="4"/>
+                <line x1="21" x2="12" y1="12" y2="12"/>
+                <line x1="8" x2="3" y1="12" y2="12"/>
+                <line x1="21" x2="16" y1="20" y2="20"/>
+                <line x1="12" x2="3" y1="20" y2="20"/>
+                <line x1="14" x2="14" y1="2" y2="6"/>
+                <line x1="8" x2="8" y1="10" y2="14"/>
+                <line x1="16" x2="16" y1="18" y2="22"/>
               </svg>
             </button>
           </div>
@@ -268,38 +257,62 @@
         <!-- Profile-specific §4.7 Banners (Fallback / Missing Chat Model / Missing Embed Model / Metadata Mismatch) -->
         <div id="profile-banners" class="profile-banners" aria-live="polite"></div>
 
-        <!-- Centered Message Stream -->
+        <!-- Message Stream -->
         <div id="chat-messages" class="chat-messages" role="log" aria-label="Conversation">
           <div id="chat-welcome" class="chat-welcome">
-            <div class="welcome-orb" aria-hidden="true">
-              <svg class="icon-lg" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2.25a.75.75 0 01.67.415l2.29 4.582 5.057.735a.75.75 0 01.416 1.279l-3.66 3.567.864 5.037a.75.75 0 01-1.088.791L12 16.277l-4.549 2.379a.75.75 0 01-1.088-.79l.864-5.038-3.66-3.567a.75.75 0 01.416-1.28l5.057-.734 2.29-4.582A.75.75 0 0112 2.25z"/>
-              </svg>
+            <div class="welcome-header">
+              <h3 id="welcome-heading" class="welcome-title">Profile</h3>
+              <p id="welcome-preamble" class="welcome-preamble" hidden></p>
             </div>
-            <h3 id="welcome-heading">How can I help with your documents?</h3>
-            <p class="welcome-subtext">Grounded strictly in this profile's local knowledge base with inline citations.</p>
-            <div class="starter-chips" aria-label="Suggested prompts">
-              <button type="button" class="starter-chip" data-prompt="What can you help me with?">
-                What can you help me with?
-              </button>
-              <button type="button" class="starter-chip" data-prompt="What documents and topics are in your knowledge base?">
-                What documents are in your knowledge base?
-              </button>
-              <button type="button" class="starter-chip" data-prompt="Give me a concise overview of the key specifications or procedures.">
-                Summarize key specifications &amp; procedures
-              </button>
+
+            <div class="welcome-section">
+              <div class="welcome-section-label">Documents</div>
+              <ul id="welcome-doc-list" class="welcome-doc-list"></ul>
+            </div>
+
+            <div class="welcome-section">
+              <div class="welcome-section-label">Example questions</div>
+              <ul id="welcome-examples" class="welcome-examples" aria-label="Example questions">
+                <li>
+                  <button
+                    type="button"
+                    class="starter-chip example-link"
+                    data-prompt="What topics and documents are covered in this knowledge base?"
+                  >
+                    What topics and documents are covered in this knowledge base?
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    class="starter-chip example-link"
+                    data-prompt="Summarize the key specifications and requirements."
+                  >
+                    Summarize the key specifications and requirements.
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    class="starter-chip example-link"
+                    data-prompt="What procedures or troubleshooting steps are documented?"
+                  >
+                    What procedures or troubleshooting steps are documented?
+                  </button>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
 
-        <!-- Floating Rounded Pill Composer -->
+        <!-- Bottom-Anchored Bordered Composer -->
         <div class="composer-shell">
           <form id="chat-form" class="chat-composer">
             <label for="chat-input" class="visually-hidden">Ask a question about this profile's documents</label>
             <textarea
               id="chat-input"
               rows="1"
-              placeholder="Ask anything about your documents…"
+              placeholder="Ask a question about your documents…"
             ></textarea>
 
             <div class="composer-toolbar">
@@ -307,27 +320,39 @@
                 <button
                   type="button"
                   id="btn-thinking-toggle"
-                  class="thinking-pill"
+                  class="thinking-toggle"
                   aria-pressed="false"
-                  title="Thinking mode is disabled by default for faster responses. Click to toggle model reasoning."
+                  title="Toggle step-by-step model thinking"
                 >
-                  <svg class="icon-sm" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path d="M10 2a6 6 0 00-3.815 10.631C7.237 13.5 8 14.443 8 15.456v.044a.75.75 0 00.75.75h2.5a.75.75 0 00.75-.75v-.044c0-1.013.762-1.957 1.815-2.825A6 6 0 0010 2zM8.25 17.5a.75.75 0 000 1.5h3.5a.75.75 0 000-1.5h-3.5z"/>
-                  </svg>
-                  <span id="thinking-pill-label">Thinking: Off</span>
+                  <span id="thinking-pill-label">Thinking off</span>
                 </button>
+                <div class="composer-lang-picker">
+                  <label for="select-answer-language" class="visually-hidden">Answer in language</label>
+                  <select id="select-answer-language" class="composer-lang-select" title="Choose answer language">
+                    <option value="auto">Answer in: Auto ▾</option>
+                    <option value="en">English</option>
+                    <option value="ms">Bahasa Melayu</option>
+                    <option value="zh">简体中文</option>
+                    <option value="ta">தமிழ்</option>
+                    <option value="id">Bahasa Indonesia</option>
+                    <option value="ja">日本語</option>
+                    <option value="ko">한국어</option>
+                    <option value="ar">العربية</option>
+                  </select>
+                </div>
                 <span class="composer-hint">Enter to send · Shift+Enter for new line</span>
               </div>
 
               <div class="composer-actions">
-                <button type="button" id="btn-stop-stream" class="send-circle-btn stop" title="Stop generating" aria-label="Stop generating" hidden>
-                  <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/>
+                <button type="button" id="btn-stop-stream" class="composer-submit-btn stop" title="Stop generating" aria-label="Stop generating" hidden>
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="6" y="6" width="12" height="12" rx="1.5"/>
                   </svg>
                 </button>
-                <button type="submit" id="btn-send-chat" class="send-circle-btn" title="Send message" aria-label="Send message">
-                  <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M10 16.25a.75.75 0 01-.75-.75V6.31L5.78 9.78a.75.75 0 01-1.06-1.06l4.75-4.75a.75.75 0 011.06 0l4.75 4.75a.75.75 0 11-1.06 1.06L10.75 6.31v9.19a.75.75 0 01-.75.75z" clip-rule="evenodd"/>
+                <button type="submit" id="btn-send-chat" class="composer-submit-btn" title="Send message" aria-label="Send message">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m5 12 7-7 7 7"/>
+                    <path d="M12 19V5"/>
                   </svg>
                 </button>
               </div>
@@ -337,53 +362,51 @@
       </div>
     </main>
 
-    <!-- Right Drawer: Profile Settings & Compact Knowledge Base Overview -->
-    <aside id="settings-panel" class="settings-panel" aria-label="Profile settings and knowledge base">
+    <!-- Right Panel: Settings & Knowledge base -->
+    <aside id="settings-panel" class="settings-panel" aria-label="Settings and knowledge base">
       <header class="drawer-header">
-        <div>
-          <h2>Settings &amp; Knowledge</h2>
-          <p class="drawer-subtitle">Configure persona, retrieval &amp; files</p>
-        </div>
+        <h2>Settings</h2>
         <button
           type="button"
           id="btn-close-settings"
           class="icon-btn"
-          title="Close panel"
-          aria-label="Close Settings and Knowledge Base panel"
+          title="Close settings"
+          aria-label="Close settings panel"
         >
-          <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <path d="M5.5 5.5l9 9m0-9l-9 9" stroke-linecap="round"/>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18"/>
+            <path d="m6 6 12 12"/>
           </svg>
         </button>
       </header>
 
       <div id="settings-content" class="drawer-scroll" hidden>
-        <!-- Uncluttered Knowledge Base Summary Section -->
+        <!-- Knowledge base Section -->
         <section class="panel-section">
           <div class="section-header-row">
-            <h3>Knowledge Base</h3>
-            <span id="docs-summary-badge" class="count-pill">0 files</span>
+            <h3 class="settings-group-heading">Knowledge base</h3>
+            <span id="docs-summary-badge" class="count-meta">0 files</span>
           </div>
 
-          <div class="kb-summary-card">
+          <div class="kb-summary-block">
             <div class="kb-stats-row">
               <div>
-                <div id="kb-card-headline" class="kb-card-headline">0 Indexed Documents</div>
-                <div id="kb-card-subline" class="kb-card-subline">0 vector chunks · PDF, DOCX, MD, TXT</div>
+                <div id="kb-card-headline" class="kb-card-headline">0 indexed documents</div>
+                <div id="kb-card-subline" class="kb-card-subline">0 chunks · PDF, DOCX, MD, TXT</div>
               </div>
               <span id="kb-warning-pill" class="warn-badge" hidden>Warning</span>
             </div>
 
-            <!-- Compact preview of at most 3 recent documents so sidebar never gets crowded -->
             <ul id="document-preview-list" class="doc-preview-list" hidden></ul>
 
             <div class="kb-card-actions">
-              <label for="file-upload-input" id="file-upload-label" class="btn secondary small upload-trigger">
-                <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path d="M9.25 13.25a.75.75 0 001.5 0V4.636l2.955 3.129a.75.75 0 001.09-1.03l-4.25-4.5a.75.75 0 00-1.09 0l-4.25 4.5a.75.75 0 101.09 1.03L9.25 4.636v8.614z"/>
-                  <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z"/>
+              <label for="file-upload-input" id="file-upload-label" class="btn small upload-trigger">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                <span>Upload Files…</span>
+                <span>Upload files…</span>
               </label>
               <input
                 type="file"
@@ -394,10 +417,7 @@
               >
 
               <button type="button" id="btn-open-docs-modal" class="btn subtle small">
-                <svg class="icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.65" aria-hidden="true">
-                  <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" stroke-linecap="round"/>
-                </svg>
-                <span id="btn-open-docs-label">View All Files</span>
+                <span id="btn-open-docs-label">View files</span>
               </button>
             </div>
           </div>
@@ -405,100 +425,266 @@
           <div id="upload-status-msg" class="status-feedback" role="status" aria-live="polite" hidden></div>
         </section>
 
-        <!-- Bot Configuration Section -->
-        <section class="panel-section">
-          <h3>Profile Settings</h3>
-          <form id="profile-settings-form" class="settings-form">
-            <div class="field-group">
-              <label for="setting-name">Display Name</label>
-              <input type="text" id="setting-name" required maxlength="80">
-            </div>
-
-            <div class="field-group">
-              <label for="setting-preamble">System Preamble</label>
-              <textarea id="setting-preamble" rows="4" placeholder="Persona, tone, domain context…"></textarea>
-              <details class="grounding-notice">
-                <summary>View fixed grounding rules (always appended)</summary>
-                <p>Answer only using the numbered context passages. Cite passages as [n]. If the passages do not contain the answer, reply exactly with the refusal message and briefly state what information is missing. Do not use outside knowledge.</p>
-              </details>
-            </div>
-
-            <div class="field-group">
-              <label for="setting-chat-model">Chat Model (Completion)</label>
-              <select id="setting-chat-model"></select>
-            </div>
-
-            <div class="field-group">
-              <label class="checkbox-row" for="setting-thinking">
-                <input type="checkbox" id="setting-thinking">
-                <span>
-                  <strong>Enable Thinking Mode by default</strong>
-                  <small class="field-hint block">Off by default for faster answers. Enable only when deep multi-step reasoning is needed.</small>
-                </span>
-              </label>
-            </div>
-
-            <div class="field-group">
-              <label for="setting-embedding-model">Embedding Model</label>
-              <select id="setting-embedding-model"></select>
-              <span class="field-hint">Changing embedding model triggers a full re-index after confirmation.</span>
-            </div>
-
-            <div class="field-group">
-              <div class="label-with-value">
-                <label for="setting-threshold">Refusal Similarity Threshold</label>
-                <output id="setting-threshold-out" for="setting-threshold">0.50</output>
-              </div>
-              <input type="range" id="setting-threshold" min="0" max="1" step="0.01" value="0.50">
-              <span class="field-hint">Factual queries scoring below this cutoff are refused in code before calling the LLM.</span>
-            </div>
-
-            <div class="field-grid-2">
+        <!-- Per-Profile Settings Form Grouped by Section Headings -->
+        <form id="profile-settings-form" class="settings-sections-form">
+          <!-- Group 1: Profile -->
+          <section class="panel-section">
+            <h3 class="settings-group-heading">Profile</h3>
+            <div class="settings-form">
               <div class="field-group">
-                <label for="setting-temperature">Temperature</label>
+                <div class="field-label-row">
+                  <label for="setting-name">Display name</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Display name" aria-describedby="info-tooltip-popover" data-tip-key="setting-name">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
+                <input type="text" id="setting-name" required maxlength="80">
+              </div>
+
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label for="setting-default-language">Default language</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Default language" aria-describedby="info-tooltip-popover" data-tip-key="setting-default-language">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
+                <select id="setting-default-language">
+                  <option value="en">English</option>
+                  <option value="ms">Bahasa Melayu</option>
+                  <option value="zh">简体中文</option>
+                  <option value="ta">தமிழ்</option>
+                  <option value="id">Bahasa Indonesia</option>
+                  <option value="ja">日本語</option>
+                  <option value="ko">한국어</option>
+                  <option value="ar">العربية</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label for="setting-preamble">System preamble</label>
+                  <button type="button" class="info-tip-btn" aria-label="About System preamble" aria-describedby="info-tooltip-popover" data-tip-key="setting-preamble">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
+                <textarea id="setting-preamble" rows="4" placeholder="Role, tone, and domain scope…"></textarea>
+                <details class="grounding-notice">
+                  <summary>Fixed grounding rules (always appended)</summary>
+                  <p>Answer only using the numbered context passages. Cite passages as [n]. If the passages do not contain the answer, reply exactly with the refusal message and briefly state what information is missing. Do not use outside knowledge.</p>
+                </details>
+              </div>
+            </div>
+          </section>
+
+          <!-- Group 2: Models -->
+          <section class="panel-section">
+            <h3 class="settings-group-heading">Models</h3>
+            <div class="settings-form">
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label for="setting-chat-model">Chat model</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Chat model" aria-describedby="info-tooltip-popover" data-tip-key="setting-chat-model">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
+                <select id="setting-chat-model"></select>
+              </div>
+
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label for="setting-thinking">Thinking</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Thinking" aria-describedby="info-tooltip-popover" data-tip-key="setting-thinking">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
+                <label class="checkbox-row" for="setting-thinking">
+                  <input type="checkbox" id="setting-thinking">
+                  <span>Enable step-by-step thinking by default</span>
+                </label>
+              </div>
+
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label for="setting-embedding-model">Embedding model</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Embedding model" aria-describedby="info-tooltip-popover" data-tip-key="setting-embedding-model">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
+                <select id="setting-embedding-model"></select>
+                <span class="field-hint">Changing the embedding model re-indexes all documents after confirmation.</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Group 3: Retrieval -->
+          <section class="panel-section">
+            <h3 class="settings-group-heading">Retrieval</h3>
+            <div class="settings-form">
+              <div class="field-group">
+                <div class="label-with-value">
+                  <div class="field-label-row">
+                    <label for="setting-threshold">Refusal similarity threshold</label>
+                    <button type="button" class="info-tip-btn" aria-label="About Refusal similarity threshold" aria-describedby="info-tooltip-popover" data-tip-key="setting-threshold">
+                      <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    </button>
+                  </div>
+                  <output id="setting-threshold-out" class="mono-num" for="setting-threshold">0.50</output>
+                </div>
+                <input type="range" id="setting-threshold" min="0" max="1" step="0.01" value="0.50">
+              </div>
+
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label for="setting-temperature">Temperature</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Temperature" aria-describedby="info-tooltip-popover" data-tip-key="setting-temperature">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
                 <input type="number" id="setting-temperature" min="0" max="2" step="0.05" value="0.2">
               </div>
+
               <div class="field-group">
-                <label for="setting-topk">Top-K Chunks</label>
+                <div class="field-label-row">
+                  <label for="setting-topk">Top-K chunks</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Top-K chunks" aria-describedby="info-tooltip-popover" data-tip-key="setting-topk">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
                 <input type="number" id="setting-topk" min="1" max="25" step="1" value="5">
               </div>
             </div>
+          </section>
 
-            <div class="field-grid-2">
+          <!-- Group 4: Indexing -->
+          <section class="panel-section">
+            <h3 class="settings-group-heading">Indexing</h3>
+            <div class="settings-form">
               <div class="field-group">
-                <label for="setting-chunk-size">Chunk Size (chars)</label>
+                <div class="field-label-row">
+                  <label for="setting-chunk-size">Chunk size</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Chunk size" aria-describedby="info-tooltip-popover" data-tip-key="setting-chunk-size">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
                 <input type="number" id="setting-chunk-size" min="100" max="8000" step="50" value="1000">
               </div>
+
               <div class="field-group">
-                <label for="setting-chunk-overlap">Overlap (chars)</label>
+                <div class="field-label-row">
+                  <label for="setting-chunk-overlap">Overlap</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Overlap" aria-describedby="info-tooltip-popover" data-tip-key="setting-chunk-overlap">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
                 <input type="number" id="setting-chunk-overlap" min="0" max="4000" step="25" value="150">
               </div>
             </div>
+          </section>
 
+          <!-- Group 5: Conversation -->
+          <section class="panel-section">
+            <h3 class="settings-group-heading">Conversation</h3>
+            <div class="settings-form">
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label for="setting-history-turns">Conversation history turns</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Conversation history turns" aria-describedby="info-tooltip-popover" data-tip-key="setting-history-turns">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
+                <input type="number" id="setting-history-turns" min="0" max="20" step="1" value="4">
+              </div>
+
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label for="setting-refusal-msg">Refusal message (English)</label>
+                  <button type="button" class="info-tip-btn" aria-label="About Refusal message" aria-describedby="info-tooltip-popover" data-tip-key="setting-refusal-msg">
+                    <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                </div>
+                <input type="text" id="setting-refusal-msg" maxlength="240">
+
+                <div class="field-subrow" style="margin-top: 0.45rem;">
+                  <div class="field-label-row">
+                    <span class="field-label-inline" style="font-size: 11.5px; color: var(--text-muted);">Other language refusals</span>
+                    <button type="button" class="info-tip-btn" aria-label="About Refusal message in other languages" aria-describedby="info-tooltip-popover" data-tip-key="setting-refusal-other-langs">
+                      <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    </button>
+                  </div>
+                  <details class="refusal-other-langs">
+                    <summary>Refusal message in other languages</summary>
+                    <div class="refusal-lang-fields">
+                      <div class="subfield-group">
+                        <label for="setting-refusal-ms">Bahasa Melayu</label>
+                        <input type="text" id="setting-refusal-ms" data-lang="ms" maxlength="240">
+                      </div>
+                      <div class="subfield-group">
+                        <label for="setting-refusal-zh">简体中文</label>
+                        <input type="text" id="setting-refusal-zh" data-lang="zh" maxlength="240">
+                      </div>
+                      <div class="subfield-group">
+                        <label for="setting-refusal-ta">தமிழ்</label>
+                        <input type="text" id="setting-refusal-ta" data-lang="ta" maxlength="240">
+                      </div>
+                      <div class="subfield-group">
+                        <label for="setting-refusal-id">Bahasa Indonesia</label>
+                        <input type="text" id="setting-refusal-id" data-lang="id" maxlength="240">
+                      </div>
+                      <div class="subfield-group">
+                        <label for="setting-refusal-ja">日本語</label>
+                        <input type="text" id="setting-refusal-ja" data-lang="ja" maxlength="240">
+                      </div>
+                      <div class="subfield-group">
+                        <label for="setting-refusal-ko">한국어</label>
+                        <input type="text" id="setting-refusal-ko" data-lang="ko" maxlength="240">
+                      </div>
+                      <div class="subfield-group">
+                        <label for="setting-refusal-ar">العربية</label>
+                        <input type="text" id="setting-refusal-ar" data-lang="ar" maxlength="240">
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              </div>
+
+              <div id="settings-save-feedback" class="status-feedback" role="status" aria-live="polite" hidden></div>
+
+              <div class="settings-actions">
+                <button type="submit" id="btn-save-settings" class="btn primary full-width">Save settings</button>
+              </div>
+
+              <div id="settings-history-box" class="settings-history-box"></div>
+
+              <div class="danger-zone">
+                <button type="button" id="btn-delete-profile" class="btn danger-outline small full-width">Delete profile</button>
+              </div>
+            </div>
+          </section>
+        </form>
+
+        <!-- Group 6: Machine-Level Performance (applies to all profiles) -->
+        <section id="performance-settings-section" class="panel-section">
+          <h3 class="settings-group-heading">Performance <span class="heading-note">(applies to all profiles)</span></h3>
+          <div class="settings-form">
             <div class="field-group">
-              <label for="setting-history-turns">Conversation History Turns</label>
-              <input type="number" id="setting-history-turns" min="0" max="20" step="1" value="4">
+              <div class="field-label-row">
+                <label for="setting-embedding-device">Embedding device</label>
+                <button type="button" class="info-tip-btn" aria-label="About Embedding device" aria-describedby="info-tooltip-popover" data-tip-key="setting-embedding-device">
+                  <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                </button>
+              </div>
+              <select
+                id="setting-embedding-device"
+                name="embedding_device"
+                aria-describedby="setting-embedding-device-hint"
+              >
+                <option value="cpu">CPU</option>
+                <option value="auto">Auto (Ollama decides)</option>
+              </select>
+              <span id="setting-embedding-device-hint" class="field-hint">Takes effect on the next request; the embedding model reloads once.</span>
             </div>
-
-            <div class="field-group">
-              <label for="setting-refusal-msg">Refusal Message</label>
-              <input type="text" id="setting-refusal-msg" maxlength="240">
-            </div>
-
-            <!-- Auto-dismissing toast banner for immediate save feedback -->
-            <div id="settings-save-feedback" class="status-feedback" role="status" aria-live="polite" hidden></div>
-
-            <div class="settings-actions">
-              <button type="submit" id="btn-save-settings" class="btn primary full-width">Save Settings</button>
-            </div>
-
-            <!-- Persistent Latest Save Timestamp & Change History (#8) -->
-            <div id="settings-history-box" class="settings-history-box"></div>
-
-            <div class="danger-zone">
-              <button type="button" id="btn-delete-profile" class="btn danger-outline small full-width">Delete Profile</button>
-            </div>
-          </form>
+            <div id="app-settings-feedback" class="status-feedback" role="status" aria-live="polite" hidden></div>
+          </div>
         </section>
       </div>
     </aside>
@@ -508,30 +694,55 @@
   <dialog id="dialog-new-profile" class="modal-dialog">
     <form id="form-new-profile" method="dialog" class="modal-body">
       <div class="modal-header-row">
-        <h2>Create Bot Profile</h2>
-        <button type="button" id="btn-close-new-profile-x" class="icon-btn tiny" aria-label="Close">✕</button>
+        <h2>New profile</h2>
+        <button type="button" id="btn-close-new-profile-x" class="icon-btn tiny" aria-label="Close">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18"/>
+            <path d="m6 6 12 12"/>
+          </svg>
+        </button>
       </div>
       <div class="field-group">
-        <label for="new-profile-name">Profile Name</label>
-        <input type="text" id="new-profile-name" placeholder="e.g. Astra NX-200 Spec Assistant" required maxlength="80">
+        <div class="field-label-row">
+          <label for="new-profile-name">Display name</label>
+          <button type="button" class="info-tip-btn" aria-label="About Display name" aria-describedby="info-tooltip-popover" data-tip-key="new-profile-name">
+            <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </button>
+        </div>
+        <input type="text" id="new-profile-name" placeholder="e.g. NX-200 technical docs" required maxlength="80">
       </div>
       <div class="field-group">
-        <label for="new-profile-preamble">System Preamble</label>
-        <textarea id="new-profile-preamble" rows="4" placeholder="You are an internal technical assistant answering questions about the Astra NX-200 product specification, maintenance SOPs, and warranty terms. Be concise and precise."></textarea>
+        <div class="field-label-row">
+          <label for="new-profile-preamble">System preamble</label>
+          <button type="button" class="info-tip-btn" aria-label="About System preamble" aria-describedby="info-tooltip-popover" data-tip-key="new-profile-preamble">
+            <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </button>
+        </div>
+        <textarea id="new-profile-preamble" rows="4" placeholder="You are an internal technical assistant answering questions about the NX-200 specification, maintenance SOPs, and warranty terms. Be concise and precise."></textarea>
       </div>
       <div class="field-grid-2">
         <div class="field-group">
-          <label for="new-profile-chat-model">Chat Model</label>
+          <div class="field-label-row">
+            <label for="new-profile-chat-model">Chat model</label>
+            <button type="button" class="info-tip-btn" aria-label="About Chat model" aria-describedby="info-tooltip-popover" data-tip-key="new-profile-chat-model">
+              <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            </button>
+          </div>
           <select id="new-profile-chat-model"></select>
         </div>
         <div class="field-group">
-          <label for="new-profile-embed-model">Embedding Model</label>
+          <div class="field-label-row">
+            <label for="new-profile-embed-model">Embedding model</label>
+            <button type="button" class="info-tip-btn" aria-label="About Embedding model" aria-describedby="info-tooltip-popover" data-tip-key="new-profile-embed-model">
+              <svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            </button>
+          </div>
           <select id="new-profile-embed-model"></select>
         </div>
       </div>
       <div class="modal-actions">
         <button type="button" id="btn-cancel-new-profile" class="btn subtle">Cancel</button>
-        <button type="submit" class="btn primary">Create Profile</button>
+        <button type="submit" class="btn primary">Create profile</button>
       </div>
     </form>
   </dialog>
@@ -539,11 +750,11 @@
   <!-- Modal 2: Embedding Model Re-index Confirmation (§4.5, §7.10) -->
   <dialog id="dialog-confirm-reindex" class="modal-dialog">
     <div class="modal-body">
-      <h2>Confirm Knowledge Base Re-index</h2>
+      <h2>Confirm knowledge base re-index</h2>
       <p id="reindex-confirm-message">Changing the embedding model will re-index all documents in this profile.</p>
       <div class="modal-actions">
         <button type="button" id="btn-cancel-reindex" class="btn subtle">Cancel</button>
-        <button type="button" id="btn-confirm-reindex" class="btn primary">Confirm &amp; Re-index</button>
+        <button type="button" id="btn-confirm-reindex" class="btn primary">Confirm and re-index</button>
       </div>
     </div>
   </dialog>
@@ -552,8 +763,8 @@
   <dialog id="dialog-citation" class="modal-dialog wide" closedby="any">
     <div class="modal-body">
       <div class="modal-header-row">
-        <h2 id="citation-modal-title">Source Passage</h2>
-        <span id="citation-modal-score" class="score-pill">Score: —</span>
+        <h2 id="citation-modal-title">Source passage</h2>
+        <span id="citation-modal-score" class="score-tag">—</span>
       </div>
       <p id="citation-modal-meta" class="citation-provenance"></p>
       <blockquote id="citation-modal-text" class="citation-excerpt"></blockquote>
@@ -569,14 +780,19 @@
   <dialog id="dialog-pull-model" class="modal-dialog">
     <div class="modal-body">
       <div class="modal-header-row">
-        <h2>Download Ollama Model</h2>
-        <button type="button" id="btn-close-pull-x" class="icon-btn tiny" aria-label="Close">✕</button>
+        <h2>Download Ollama model</h2>
+        <button type="button" id="btn-close-pull-x" class="icon-btn tiny" aria-label="Close">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18"/>
+            <path d="m6 6 12 12"/>
+          </svg>
+        </button>
       </div>
-      <p class="helper-text">Downloads connect to the Ollama model registry and require internet access. All inference and indexing run 100% offline afterwards.</p>
+      <p class="helper-text">Downloads connect to the Ollama model registry and require internet access. Inference and indexing run locally.</p>
 
       <div id="pull-step-input">
         <div class="field-group">
-          <label for="pull-model-name">Model Tag</label>
+          <label for="pull-model-name">Model tag</label>
           <input type="text" id="pull-model-name" placeholder="e.g. qwen3.5:4b or nomic-embed-text">
           <span id="pull-size-estimate" class="field-hint">Approximate size will be confirmed before downloading.</span>
         </div>
@@ -588,7 +804,7 @@
       <div id="pull-step-progress" class="pull-progress-area" hidden>
         <div class="label-with-value">
           <span id="pull-status-label">Starting download…</span>
-          <span id="pull-percent-label">0%</span>
+          <span id="pull-percent-label" class="mono-num">0%</span>
         </div>
         <progress id="pull-progress-bar" max="100" value="0"></progress>
       </div>
@@ -603,26 +819,28 @@
 
       <div class="modal-actions">
         <button type="button" id="btn-cancel-pull" class="btn subtle">Close</button>
-        <button type="button" id="btn-step-confirm-pull" class="btn secondary">Review Download</button>
-        <button type="button" id="btn-start-pull" class="btn primary" hidden>Confirm &amp; Download</button>
+        <button type="button" id="btn-step-confirm-pull" class="btn">Review download</button>
+        <button type="button" id="btn-start-pull" class="btn primary" hidden>Confirm and download</button>
       </div>
     </div>
   </dialog>
 
-  <!-- Modal 5: Organized Knowledge Base Document Manager (#7) -->
+  <!-- Modal 5: Knowledge Base Document Manager (#7) -->
   <dialog id="dialog-manage-docs" class="modal-dialog xwide" closedby="any">
     <div class="modal-body">
       <div class="modal-header-row">
         <div>
-          <h2 id="docs-modal-title">Knowledge Base Documents</h2>
-          <p id="docs-modal-subtitle" class="helper-text">0 documents · 0 indexed chunks</p>
+          <h2 id="docs-modal-title">Knowledge base documents</h2>
+          <p id="docs-modal-subtitle" class="helper-text mono-meta">0 documents · 0 indexed chunks</p>
         </div>
         <div class="modal-header-actions">
-          <label for="modal-file-upload-input" id="modal-file-upload-label" class="btn secondary small upload-trigger">
-            <svg class="icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/>
+          <label for="modal-file-upload-input" id="modal-file-upload-label" class="btn small upload-trigger">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <span>Upload Files…</span>
+            <span>Upload files…</span>
           </label>
           <input
             type="file"
@@ -631,7 +849,12 @@
             multiple
             class="visually-hidden"
           >
-          <button type="button" id="btn-close-docs-modal" class="icon-btn" aria-label="Close document manager">✕</button>
+          <button type="button" id="btn-close-docs-modal" class="icon-btn tiny" aria-label="Close document manager">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18"/>
+              <path d="m6 6 12 12"/>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -640,8 +863,8 @@
           type="search"
           id="docs-search-input"
           class="docs-search-input"
-          placeholder="Search documents by filename…"
-          aria-label="Search documents by filename"
+          placeholder="Filter by filename…"
+          aria-label="Filter documents by filename"
         >
         <div class="filter-pills" role="group" aria-label="Filter documents">
           <button type="button" class="filter-pill active" data-doc-filter="all">All</button>
@@ -664,25 +887,36 @@
     </div>
   </dialog>
 
-  <!-- Modal 6: Save Conversation (#10) -->
+  <!-- Modal 6: Save Chat (#10) -->
   <dialog id="dialog-save-chat" class="modal-dialog" closedby="any">
     <form id="form-save-chat" method="dialog" class="modal-body">
       <div class="modal-header-row">
-        <h2>Save Conversation</h2>
-        <button type="button" id="btn-close-save-chat-x" class="icon-btn tiny" aria-label="Close">✕</button>
+        <h2>Save chat</h2>
+        <button type="button" id="btn-close-save-chat-x" class="icon-btn tiny" aria-label="Close">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18"/>
+            <path d="m6 6 12 12"/>
+          </svg>
+        </button>
       </div>
-      <p class="helper-text">Saved chats are stored locally on your machine under this profile so you can reopen or continue them anytime.</p>
+      <p class="helper-text">Saved chats are stored locally under this profile so you can reopen or continue them later.</p>
       <div class="field-group">
-        <label for="save-chat-title">Conversation Title</label>
-        <input type="text" id="save-chat-title" required maxlength="120" placeholder="e.g. NX-200 Thermal Limits &amp; Maintenance">
+        <label for="save-chat-title">Title</label>
+        <input type="text" id="save-chat-title" required maxlength="120" placeholder="e.g. NX-200 thermal limits and maintenance">
       </div>
       <div class="modal-actions">
         <button type="button" id="btn-cancel-save-chat" class="btn subtle">Cancel</button>
-        <button type="submit" class="btn primary">Save Chat</button>
+        <button type="submit" class="btn primary">Save chat</button>
       </div>
     </form>
   </dialog>
 
-  <script type="module" src="/static/js/main.js?v=1.2.0"></script>
+  <!-- Accessible Setting Info Tooltip Popover (§Part 3) -->
+  <div id="info-tooltip-popover" class="info-popover" role="tooltip" popover="manual" hidden></div>
+
+  <!-- Shared Translate Dropdown Popover (§ Part 2) -->
+  <div id="translate-dropdown-popover" class="translate-dropdown-menu translate-popover" role="menu" popover="auto" hidden></div>
+
+  <script type="module" src="/static/js/main.js?v=2.0.0"></script>
 </body>
 </html>

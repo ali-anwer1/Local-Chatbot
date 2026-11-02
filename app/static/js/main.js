@@ -1,11 +1,10 @@
-/* Local RAG Chatbot — Offline Browser Client Entry Point (§4.5, §4.7 + UX Enhancements) */
+/* Local RAG Chatbot — Offline Browser Client Entry Point (§4.5, §4.7 + UX Redesign) */
 
 import { apiJson } from "./api.js";
 import { renderProfileBanners } from "./banners.js";
 import {
   buildTurnSourcesMap,
   configureChat,
-  executeChatQuery,
   exportActiveChatAsMarkdown,
   getTranscript,
   handleSendChat,
@@ -25,6 +24,7 @@ import {
   renderDocumentSummaryAndModal,
 } from "./documents.js";
 import { el } from "./dom.js";
+import { initInfoTips } from "./infoTips.js";
 import {
   closeOrCancelPull,
   configurePullModal,
@@ -37,14 +37,18 @@ import {
   collectSettingsPayload,
   confirmPendingReindex,
   configureSettings,
+  renderAppSettingsForm,
   renderSettingsForm,
   renderSettingsHistory,
   requestEmbeddingModelSwitch,
+  saveAppSettings,
   saveProfilePatch,
 } from "./settings.js";
 import { state } from "./state.js";
 import {
   copyToClipboard,
+  escapeHtml,
+  getFileExtensionBadge,
   isThinkingEnabled,
   populateModelSelect,
   setLeftSidebarCollapsed,
@@ -60,12 +64,14 @@ import {
 export async function refreshAll(forceRefresh = false) {
   const query = forceRefresh ? "?refresh=true" : "";
   try {
-    const [health, profilesData] = await Promise.all([
+    const [health, profilesData, appSettings] = await Promise.all([
       apiJson(`/api/health${query}`),
       apiJson("/api/profiles"),
+      apiJson("/api/app-settings"),
     ]);
     state.health = health;
     state.profiles = profilesData.profiles || [];
+    state.appSettings = appSettings;
 
     if (
       state.activeProfileId &&
@@ -112,7 +118,9 @@ function renderGlobalStatus() {
     el.ollamaStatusPill.className = "status-pill online";
     const modelCount = (h.models || []).length;
     el.ollamaStatusText.textContent =
-      modelCount > 0 ? `Ollama online · ${modelCount} model(s)` : "Ollama online · 0 models";
+      modelCount > 0
+        ? `Ollama online · ${modelCount} model${modelCount === 1 ? "" : "s"}`
+        : "Ollama online · 0 models";
   }
 }
 
@@ -150,7 +158,9 @@ export function renderProfileSidebar() {
 
     const meta = document.createElement("span");
     meta.className = "profile-item-meta";
-    meta.textContent = `${prof.document_count || 0} doc(s) · ${prof.total_chunks || 0} chunks`;
+    const docCount = prof.document_count || 0;
+    const chunkCount = prof.total_chunks || 0;
+    meta.textContent = `${docCount} doc${docCount === 1 ? "" : "s"} · ${chunkCount} chunks`;
 
     btn.appendChild(top);
     btn.appendChild(meta);
@@ -193,7 +203,7 @@ function renderFirstRunCommands() {
     if (modelTag) {
       const pullBtn = document.createElement("button");
       pullBtn.type = "button";
-      pullBtn.className = "btn secondary small";
+      pullBtn.className = "btn small";
       pullBtn.textContent = "Download…";
       pullBtn.addEventListener("click", () => openPullModal(modelTag));
       actions.appendChild(pullBtn);
@@ -201,6 +211,49 @@ function renderFirstRunCommands() {
 
     row.appendChild(actions);
     el.recommendedCommandsList.appendChild(row);
+  }
+}
+
+function renderEmptyState(prof) {
+  if (!el.welcomeHeading) return;
+  el.welcomeHeading.textContent = prof.name;
+
+  const firstLine = (prof.preamble || "").trim().split("\n")[0].trim();
+  if (firstLine && el.welcomePreamble) {
+    el.welcomePreamble.textContent = firstLine;
+    el.welcomePreamble.hidden = false;
+  } else if (el.welcomePreamble) {
+    el.welcomePreamble.hidden = true;
+  }
+
+  if (el.welcomeDocList) {
+    el.welcomeDocList.innerHTML = "";
+    const docs = state.documents || [];
+    if (docs.length === 0) {
+      const li = document.createElement("li");
+      li.className = "welcome-doc-empty";
+      li.textContent = "No documents uploaded yet.";
+      el.welcomeDocList.appendChild(li);
+    } else {
+      const slice = docs.slice(0, 8);
+      for (const doc of slice) {
+        const li = document.createElement("li");
+        li.className = "welcome-doc-row";
+        const ext = getFileExtensionBadge(doc.filename);
+        li.innerHTML = `<span class="welcome-doc-type">${escapeHtml(ext)}</span><span class="welcome-doc-name">${escapeHtml(doc.filename)}</span>`;
+        el.welcomeDocList.appendChild(li);
+      }
+      if (docs.length > 8) {
+        const moreLi = document.createElement("li");
+        const moreBtn = document.createElement("button");
+        moreBtn.type = "button";
+        moreBtn.className = "welcome-doc-more-link";
+        moreBtn.textContent = `+${docs.length - 8} more…`;
+        moreBtn.addEventListener("click", openDocsManagerModal);
+        moreLi.appendChild(moreBtn);
+        el.welcomeDocList.appendChild(moreLi);
+      }
+    }
   }
 }
 
@@ -235,19 +288,23 @@ export function renderMainView(opts = {}) {
   const avail = prof.availability || {};
 
   el.activeProfileTitle.textContent = prof.name;
-  el.welcomeHeading.textContent = `Ask ${prof.name} anything`;
   const activeModelLabel = avail.fallback_active
     ? `${avail.effective_chat_model} (fallback)`
     : avail.effective_chat_model || prof.chat_model;
   el.activeModelBadge.textContent = activeModelLabel;
-  el.activeKbBadge.textContent = `${prof.document_count || 0} doc(s) · ${prof.total_chunks || 0} chunks`;
+
+  const docCount = prof.document_count || 0;
+  const chunkCount = prof.total_chunks || 0;
+  el.activeKbBadge.textContent = `${docCount} doc${docCount === 1 ? "" : "s"} · ${chunkCount} chunks`;
 
   setThinkingEnabled(prof.id, isThinkingEnabled(prof.id));
   renderProfileBanners(prof, avail);
   updateInteractiveControlsLock(avail);
   renderSettingsForm(prof, { preserveFeedback: Boolean(opts.preserveFeedback) });
+  renderAppSettingsForm();
   renderSettingsHistory(prof);
   renderDocumentSummaryAndModal();
+  renderEmptyState(prof);
   renderConversationTranscript(prof.id);
   updateChatActionButtons(prof.id);
 }
@@ -288,10 +345,14 @@ function bindEvents() {
 
   // Left Sidebar Collapse / Expand (#9)
   el.btnCloseLeftSidebar.addEventListener("click", () => setLeftSidebarCollapsed(true));
-  el.btnOpenLeftSidebar.addEventListener("click", () => setLeftSidebarCollapsed(false));
-  el.btnOpenLeftSidebarAlt.addEventListener("click", () => setLeftSidebarCollapsed(false));
+  if (el.btnOpenLeftSidebar) {
+    el.btnOpenLeftSidebar.addEventListener("click", () => setLeftSidebarCollapsed(false));
+  }
+  if (el.btnOpenLeftSidebarAlt) {
+    el.btnOpenLeftSidebarAlt.addEventListener("click", () => setLeftSidebarCollapsed(false));
+  }
 
-  // Right Settings & Knowledge Drawer Open / Close (#6)
+  // Right Settings Panel Open / Close (#6)
   el.btnToggleSettings.addEventListener("click", () => {
     setSettingsPanelOpen(!state.settingsPanelOpen);
   });
@@ -310,7 +371,7 @@ function bindEvents() {
     setThinkingEnabled(state.activeProfileId, el.settingThinking.checked);
   });
 
-  // Delegated click handler for inline [n] citation chips (works live mid-stream & post-stream)
+  // Delegated click handler for inline superscript [n] citation chips
   el.chatMessages.addEventListener("click", (event) => {
     const chip = event.target.closest(".citation-chip");
     if (!chip || !state.activeProfileId) return;
@@ -327,30 +388,80 @@ function bindEvents() {
     }
   });
 
-  // Starter Prompt Chips (#1, #2)
+  // Starter / Example prompt links: fill composer and focus when clicked
   el.chatWelcome.querySelectorAll(".starter-chip").forEach((chip) => {
     chip.addEventListener("click", () => {
-      if (!state.activeProfile || el.chatInput.disabled || state.chatAbortController) return;
+      if (el.chatInput.disabled || state.chatAbortController) return;
       const promptText = chip.dataset.prompt || chip.textContent.trim();
-      executeChatQuery(promptText);
+      el.chatInput.value = promptText;
+      el.chatInput.style.height = "auto";
+      el.chatInput.focus();
     });
   });
 
-  // Toggle Debug panel across all messages immediately
-  el.toggleDebug.addEventListener("change", () => {
-    state.debugEnabled = el.toggleDebug.checked;
-    document.querySelectorAll(".debug-panel").forEach((node) => {
-      node.hidden = !state.debugEnabled;
+  // Overflow menu: Toggle Debug & Keyboard Navigation
+  if (el.toggleDebug) {
+    el.toggleDebug.addEventListener("click", () => {
+      state.debugEnabled = !state.debugEnabled;
+      el.toggleDebug.setAttribute("aria-checked", String(state.debugEnabled));
+      el.toggleDebug.classList.toggle("checked", state.debugEnabled);
+      document.querySelectorAll(".debug-panel").forEach((node) => {
+        node.hidden = !state.debugEnabled;
+      });
+      if (el.chatOverflowMenu && el.chatOverflowMenu.matches(":popover-open")) {
+        el.chatOverflowMenu.hidePopover();
+      }
     });
-  });
+  }
+
+  if (el.chatOverflowMenu && el.btnOverflowMenu) {
+    el.chatOverflowMenu.addEventListener("toggle", (event) => {
+      const isOpen = event.newState === "open";
+      el.btnOverflowMenu.setAttribute("aria-expanded", String(isOpen));
+      if (isOpen && el.toggleDebug) {
+        el.toggleDebug.setAttribute("aria-checked", String(state.debugEnabled));
+        el.toggleDebug.classList.toggle("checked", state.debugEnabled);
+      }
+    });
+
+    el.chatOverflowMenu.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        el.chatOverflowMenu.hidePopover();
+        el.btnOverflowMenu.focus();
+        return;
+      }
+      if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        const items = [...el.chatOverflowMenu.querySelectorAll(".menu-item:not(:disabled)")];
+        if (items.length === 0) return;
+        const current = items.indexOf(document.activeElement);
+        let next = 0;
+        if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = items.length - 1;
+        else if (event.key === "ArrowUp") next = (current - 1 + items.length) % items.length;
+        else if (event.key === "ArrowDown") next = (current + 1) % items.length;
+        event.preventDefault();
+        items[next].focus();
+      }
+    });
+  }
 
   // New Chat / Clear Chat
   el.btnClearChat.addEventListener("click", startNewChat);
-  el.btnSidebarNewChat.addEventListener("click", startNewChat);
-  el.btnHeaderNewChat.addEventListener("click", startNewChat);
+  if (el.btnSidebarNewChat) {
+    el.btnSidebarNewChat.addEventListener("click", startNewChat);
+  }
+  if (el.btnHeaderNewChat) {
+    el.btnHeaderNewChat.addEventListener("click", startNewChat);
+  }
 
   // Save Chat & Export .md (#10)
-  el.btnSaveChat.addEventListener("click", openSaveChatDialog);
+  el.btnSaveChat.addEventListener("click", () => {
+    if (el.chatOverflowMenu && el.chatOverflowMenu.matches(":popover-open")) {
+      el.chatOverflowMenu.hidePopover();
+    }
+    openSaveChatDialog();
+  });
   el.btnCancelSaveChat.addEventListener("click", () => el.dialogSaveChat.close());
   el.btnCloseSaveChatX.addEventListener("click", () => el.dialogSaveChat.close());
   el.formSaveChat.addEventListener("submit", async (event) => {
@@ -365,7 +476,13 @@ function bindEvents() {
       alert(err.message);
     }
   });
-  el.btnExportChat.addEventListener("click", exportActiveChatAsMarkdown);
+
+  el.btnExportChat.addEventListener("click", () => {
+    if (el.chatOverflowMenu && el.chatOverflowMenu.matches(":popover-open")) {
+      el.chatOverflowMenu.hidePopover();
+    }
+    exportActiveChatAsMarkdown();
+  });
 
   // Knowledge Base Document Manager Modal (#7)
   el.btnOpenDocsModal.addEventListener("click", openDocsManagerModal);
@@ -466,6 +583,11 @@ function bindEvents() {
   el.btnCancelReindex.addEventListener("click", cancelPendingReindex);
   el.btnConfirmReindex.addEventListener("click", confirmPendingReindex);
 
+  // Save Machine-Wide App Settings (Embedding Device)
+  el.settingEmbeddingDevice.addEventListener("change", () => {
+    saveAppSettings(el.settingEmbeddingDevice.value);
+  });
+
   // Save Profile Settings
   el.settingsForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -527,4 +649,5 @@ configureChat({ refreshAll });
 
 setSettingsPanelOpen(false);
 bindEvents();
+initInfoTips();
 refreshAll(false);

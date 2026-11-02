@@ -98,6 +98,8 @@ class DeterministicMockBackend(LLMBackend):
         self.fail_mid_stream_models: set[str] = set()
         self.pull_offline: bool = False
         self.next_chat_reply: str | None = None
+        self.next_chat_stats: dict[str, Any] | None = None
+        self._last_chat_stats: dict[str, Any] | None = None
 
         self.chat_calls: list[dict[str, Any]] = []
         self.embed_calls: list[dict[str, Any]] = []
@@ -167,6 +169,9 @@ class DeterministicMockBackend(LLMBackend):
             raise BackendUnavailableError(self.base_url, details="Connection refused")
         if model in self.fail_load_models:
             raise ModelLoadError(model, details="llama_model_load: error loading model: not enough RAM")
+
+        self._last_chat_stats = self.next_chat_stats
+        self.next_chat_stats = None
 
         self.chat_calls.append(
             {"model": model, "messages": messages, "options": options, "stream": stream}
