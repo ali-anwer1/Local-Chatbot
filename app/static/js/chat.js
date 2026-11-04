@@ -732,6 +732,7 @@ export function createTranslationBlockDOM({
 }
 
 let activeTranslateTrigger = null;
+let suppressNextOpenForTrigger = null;
 
 export function getTranslatePopover() {
   return document.getElementById("translate-dropdown-popover");
@@ -798,13 +799,19 @@ export function openTranslateMenu(triggerBtn, turn, profileId, row) {
   const popover = getTranslatePopover();
   if (!popover) return;
 
-  // Toggle close if clicking the currently open trigger
-  if (activeTranslateTrigger === triggerBtn && isTranslatePopoverOpen(popover)) {
+  // Toggle close if clicking the currently open trigger (including when browser light-dismiss ran on pointerdown/up)
+  if (
+    suppressNextOpenForTrigger === triggerBtn ||
+    (activeTranslateTrigger === triggerBtn && isTranslatePopoverOpen(popover))
+  ) {
+    suppressNextOpenForTrigger = null;
     closeTranslatePopover();
     return;
   }
+  suppressNextOpenForTrigger = null;
 
   closeTranslatePopover();
+  popover.removeAttribute("hidden");
   activeTranslateTrigger = triggerBtn;
   triggerBtn.setAttribute("aria-expanded", "true");
 
@@ -1102,6 +1109,15 @@ function buildAssistantTurnDOM(turn, turnIndex, profileId) {
     translateBtn.setAttribute("aria-haspopup", "menu");
     translateBtn.setAttribute("aria-expanded", "false");
     translateBtn.innerHTML = `${SVG_ICONS.translate}<span>Translate ▾</span>`;
+    translateBtn.addEventListener("pointerdown", () => {
+      suppressNextOpenForTrigger =
+        activeTranslateTrigger === translateBtn && isTranslatePopoverOpen()
+          ? translateBtn
+          : null;
+    });
+    translateBtn.addEventListener("keydown", () => {
+      suppressNextOpenForTrigger = null;
+    });
     translateBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       openTranslateMenu(translateBtn, turn, profileId, row);
