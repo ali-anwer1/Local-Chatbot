@@ -1,7 +1,7 @@
 /* Chat Transcript Rendering, Streaming, Copy/Retry, Citations, Saved Chats & Export (§4.3, §4.5, #10) */
 
 import { apiJson, streamSSE } from "./api.js";
-import { SUPPORTED_LANG_MAP, SUPPORTED_LANGUAGES, SVG_ICONS } from "./constants.js";
+import { SVG_ICONS } from "./constants.js";
 import { el } from "./dom.js";
 import { formatAssistantMarkdownAndCitations } from "./markdown.js";
 import { state } from "./state.js";
@@ -93,7 +93,7 @@ export function suggestChatTitle(turns) {
   return cleaned.length > 56 ? `${cleaned.slice(0, 56).trim()}…` : cleaned;
 }
 
-export function serializeTurnsForSave(turns) {
+function serializeTurnsForSave(turns) {
   return turns
     .filter((t) => !t.streaming)
     .map((t) => {
@@ -120,7 +120,7 @@ export function serializeTurnsForSave(turns) {
     });
 }
 
-export function buildHistoryForRequest(turns) {
+function buildHistoryForRequest(turns) {
   const history = [];
   for (const t of turns) {
     if (t.streaming || t.error) continue;
@@ -303,8 +303,10 @@ export function exportActiveChatAsMarkdown() {
         if (transEntries.length > 0) {
           lines.push("**Translations:**", "");
           for (const [code, transText] of transEntries) {
-            const langMeta = SUPPORTED_LANG_MAP[code];
-            const langLabel = langMeta ? `${langMeta.nativeName} (${langMeta.name})` : code;
+            const langMeta = state.languagesByCode?.[code];
+            const langLabel = langMeta
+              ? `${langMeta.native_name} (${langMeta.english_name})`
+              : code;
             lines.push(`#### ${langLabel}`, "", transText, "");
           }
         }
@@ -445,13 +447,12 @@ function createDebugElement(turn) {
     langLine.className = "helper-text debug-language-line";
     const det = turn.language.detected_language || "none";
     const conf =
-      turn.language.language_confidence !== undefined &&
-      turn.language.language_confidence !== null
-        ? Number(turn.language.language_confidence).toFixed(2)
+      turn.language.confidence !== undefined && turn.language.confidence !== null
+        ? Number(turn.language.confidence).toFixed(2)
         : "—";
     const target = turn.language.target_language || "en";
-    const name = turn.language.language_name || target;
-    const rule = turn.language.language_rule || "fallback";
+    const name = turn.language.instruction_name || target;
+    const rule = turn.language.rule || "fallback";
     langLine.innerHTML = `<strong>Language:</strong> ${escapeHtml(target)} (${escapeHtml(name)}) · <strong>Detected:</strong> ${escapeHtml(det)} (${escapeHtml(conf)}) · <strong>Rule:</strong> <code>${escapeHtml(rule)}</code>`;
     wrap.appendChild(langLine);
   }
@@ -676,13 +677,13 @@ export function createTranslationBlockDOM({
   block.open = true;
   block.dataset.transLang = langCode;
 
-  const langMeta = SUPPORTED_LANG_MAP[langCode] || { nativeName: langCode, name: langCode };
+  const langMeta = state.languagesByCode?.[langCode] || { native_name: langCode, english_name: langCode };
   const summary = document.createElement("summary");
   summary.className = "translation-header";
 
   const labelSpan = document.createElement("span");
   labelSpan.className = "translation-lang-label";
-  labelSpan.textContent = `${langMeta.nativeName} ▾`;
+  labelSpan.textContent = `${langMeta.native_name || langCode} ▾`;
   summary.appendChild(labelSpan);
 
   const headerActions = document.createElement("div");
@@ -721,7 +722,7 @@ export function createTranslationBlockDOM({
   bodyDiv.className = "translation-body";
   const sourcesMap = buildTurnSourcesMap(turn);
   if (streaming && !initialText) {
-    bodyDiv.innerHTML = `<span class="translating-indicator">Translating into ${escapeHtml(langMeta.nativeName)}…</span>`;
+    bodyDiv.innerHTML = `<span class="translating-indicator">Translating into ${escapeHtml(langMeta.native_name || langCode)}…</span>`;
   } else {
     bodyDiv.innerHTML = formatAssistantMarkdownAndCitations(initialText, sourcesMap);
   }
@@ -731,58 +732,31 @@ export function createTranslationBlockDOM({
 }
 
 let activeTranslateTrigger = null;
-let activeTranslateTurn = null;
-let activeTranslateProfileId = null;
-let activeTranslateRow = null;
 
-export function getOrCreateTranslatePopover() {
-  let popover = document.getElementById("translate-dropdown-popover");
-  if (!popover) {
-    popover = document.createElement("div");
-    popover.id = "translate-dropdown-popover";
-    popover.className = "translate-dropdown-menu translate-popover";
-    popover.setAttribute("role", "menu");
-    popover.setAttribute("hidden", "");
-    try {
-      popover.setAttribute("popover", "auto");
-    } catch {
-      // Ignore if unsupported
-    }
-    document.body.appendChild(popover);
-  }
-  return popover;
+export function getTranslatePopover() {
+  return document.getElementById("translate-dropdown-popover");
 }
 
-export function isTranslatePopoverOpen(popover = getOrCreateTranslatePopover()) {
-  if (!popover) return false;
-  if (typeof popover.matches === "function" && popover.matches(":popover-open")) {
-    return true;
-  }
-  return popover.classList.contains("fallback-open") && !popover.hasAttribute("hidden");
+export function isTranslatePopoverOpen(popover = getTranslatePopover()) {
+  return Boolean(popover && typeof popover.matches === "function" && popover.matches(":popover-open"));
 }
 
 export function closeTranslatePopover() {
   const popover = document.getElementById("translate-dropdown-popover");
-  if (!popover) return;
-  if (typeof popover.hidePopover === "function") {
+  if (popover && typeof popover.hidePopover === "function") {
     try {
       popover.hidePopover();
     } catch {
       // Ignored if already closed
     }
   }
-  popover.classList.remove("fallback-open");
-  popover.setAttribute("hidden", "");
   if (activeTranslateTrigger) {
     activeTranslateTrigger.setAttribute("aria-expanded", "false");
     activeTranslateTrigger = null;
   }
-  activeTranslateTurn = null;
-  activeTranslateProfileId = null;
-  activeTranslateRow = null;
 }
 
-export function positionTranslatePopover(trigger, popover) {
+function positionTranslatePopover(trigger, popover) {
   const triggerRect = trigger.getBoundingClientRect();
   const popoverRect = popover.getBoundingClientRect();
 
@@ -821,7 +795,7 @@ export function positionTranslatePopover(trigger, popover) {
 }
 
 export function openTranslateMenu(triggerBtn, turn, profileId, row) {
-  const popover = getOrCreateTranslatePopover();
+  const popover = getTranslatePopover();
   if (!popover) return;
 
   // Toggle close if clicking the currently open trigger
@@ -831,18 +805,13 @@ export function openTranslateMenu(triggerBtn, turn, profileId, row) {
   }
 
   closeTranslatePopover();
-
   activeTranslateTrigger = triggerBtn;
-  activeTranslateTurn = turn;
-  activeTranslateProfileId = profileId;
-  activeTranslateRow = row;
-
   triggerBtn.setAttribute("aria-expanded", "true");
 
   popover.innerHTML = "";
   const currentLang = turn.language?.target_language || "en";
   const activeTrans = turn.activeTranslationLang || null;
-  const availableLangs = SUPPORTED_LANGUAGES.filter(
+  const availableLangs = (state.languages || []).filter(
     (l) => l.code !== currentLang && l.code !== activeTrans
   );
 
@@ -855,13 +824,13 @@ export function openTranslateMenu(triggerBtn, turn, profileId, row) {
 
     const nativeSpan = document.createElement("span");
     nativeSpan.className = "menu-item-native";
-    nativeSpan.textContent = lang.nativeName;
+    nativeSpan.textContent = lang.native_name;
     itemBtn.appendChild(nativeSpan);
 
-    if (lang.name && lang.name !== lang.nativeName) {
+    if (lang.english_name && lang.english_name !== lang.native_name) {
       const latinSpan = document.createElement("span");
       latinSpan.className = "menu-item-latin";
-      latinSpan.textContent = lang.name;
+      latinSpan.textContent = lang.english_name;
       itemBtn.appendChild(latinSpan);
     }
 
@@ -873,41 +842,22 @@ export function openTranslateMenu(triggerBtn, turn, profileId, row) {
     popover.appendChild(itemBtn);
   }
 
-  popover.removeAttribute("hidden");
   if (typeof popover.showPopover === "function") {
     try {
-      popover.showPopover();
+      popover.showPopover({ source: triggerBtn });
     } catch {
-      // Ignored if already open
+      try {
+        popover.showPopover();
+      } catch {
+        // Ignored if already open
+      }
     }
-  } else {
-    popover.classList.add("fallback-open");
   }
 
   positionTranslatePopover(triggerBtn, popover);
 }
 
-export async function triggerTranslation(profileId, turnOrIndex, targetLang, row) {
-  let turn = null;
-  let turnIndex = -1;
-  const turns = getTranscript(profileId);
-
-  if (typeof turnOrIndex === "object" && turnOrIndex !== null) {
-    turn = turnOrIndex;
-    turnIndex = turns.indexOf(turn);
-  } else {
-    turnIndex = Number(turnOrIndex);
-    turn = turns[turnIndex];
-  }
-
-  if (!turn && row && row.dataset.turnIdx !== undefined) {
-    const idx = Number(row.dataset.turnIdx);
-    if (!Number.isNaN(idx) && turns[idx]) {
-      turn = turns[idx];
-      turnIndex = idx;
-    }
-  }
-
+async function triggerTranslation(profileId, turn, targetLang, row) {
   if (!turn || !turn.text) return;
 
   turn.translations = turn.translations || {};
@@ -969,7 +919,6 @@ export async function triggerTranslation(profileId, turnOrIndex, targetLang, row
   row._translationAbortController = abortCtrl;
 
   let fullText = "";
-  let hadError = false;
   const sourcesMap = buildTurnSourcesMap(turn);
   try {
     await streamSSE(
@@ -991,17 +940,11 @@ export async function triggerTranslation(profileId, turnOrIndex, targetLang, row
             turn.translations[targetLang] = fullText;
             bodyDiv.innerHTML = formatAssistantMarkdownAndCitations(fullText, sourcesMap);
           } else if (evType === "error") {
-            hadError = true;
             bodyDiv.innerHTML = `<span class="helper-text error-text">${escapeHtml(payload.message || "Translation error.")}</span>`;
           }
         },
       }
     );
-
-    if (!hadError && fullText) {
-      turn.translations[targetLang] = fullText;
-      bodyDiv.innerHTML = formatAssistantMarkdownAndCitations(fullText, sourcesMap);
-    }
 
     if (state.activeSavedChatByProfile.get(profileId)) {
       await persistSavedChat(profileId).catch(() => {});
@@ -1354,10 +1297,8 @@ export async function executeChatQuery(message) {
         } else if (evType === "meta") {
           assistantTurn.refused = Boolean(payload.refused);
           assistantTurn.conversational = Boolean(payload.conversational);
-          assistantTurn.candidateSources =
-            payload.candidate_sources || payload.sources || [];
-          assistantTurn.sources = payload.sources || [];
-          assistantTurn.debugChunks = payload.debug_chunks || [];
+          assistantTurn.candidateSources = payload.candidate_sources || [];
+          assistantTurn.debugChunks = payload.candidate_sources || [];
           assistantTurn.bestScore = payload.best_score ?? 0;
           assistantTurn.threshold = payload.threshold ?? 0.5;
           assistantTurn.retrievalQuery = payload.retrieval_query || "";
@@ -1437,7 +1378,7 @@ export async function executeChatQuery(message) {
 }
 
 if (typeof document !== "undefined") {
-  const popover = getOrCreateTranslatePopover();
+  const popover = getTranslatePopover();
 
   // Sync aria-expanded when light-dismissed by native Popover API
   if (popover && typeof popover.addEventListener === "function") {
@@ -1450,21 +1391,6 @@ if (typeof document !== "undefined") {
       }
     });
   }
-
-  // Dismiss on click outside for browsers in fallback mode
-  document.addEventListener("click", (e) => {
-    if (!isTranslatePopoverOpen(popover)) return;
-    if (!popover.contains(e.target) && !activeTranslateTrigger?.contains(e.target)) {
-      closeTranslatePopover();
-    }
-  });
-
-  // Dismiss on Escape key
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && isTranslatePopoverOpen(popover)) {
-      closeTranslatePopover();
-    }
-  });
 
   // Dismiss on resize or chat scroll so popover doesn't detach from button
   window.addEventListener("resize", () => {

@@ -43,9 +43,9 @@ def test_refusal_gate_blocks_out_of_scope_without_calling_llm(
     )
 
     assert out_of_scope.refused is True
-    assert "I can't answer that from my knowledge base." in out_of_scope.answer
-    assert "No relevant content found in this bot's knowledge base." in out_of_scope.answer
-    assert "threshold is 0.50" in out_of_scope.answer
+    assert out_of_scope.answer == "I can't answer that from my knowledge base."
+    assert "No relevant content found in this bot's knowledge base." in out_of_scope.refusal_reason
+    assert "threshold is 0.50" in out_of_scope.refusal_reason
     assert out_of_scope.sources == []
     # CRITICAL (§7.3): LLM chat() must NEVER be called when the gate fails!
     assert len(mock_backend.chat_calls) == 0
@@ -287,3 +287,54 @@ def test_live_status_events_and_thinking_mode_default_off(
         )
     )
     assert mock_backend.chat_calls[-1]["options"]["think"] is True
+
+
+def test_query_returns_real_language_rule_and_confidence(
+    chatbot_service: ChatbotService,
+):
+    """1a: RAGEngine.query() returns real rule ('selector') and confidence when requested_language is set."""
+    prof = chatbot_service.create_profile({"name": "Lang Rule Bot"})
+    pid = prof["id"]
+    chatbot_service.ingest_document(
+        pid,
+        filename="notes.txt",
+        data=b"Industrial gateway operates at 24V DC input voltage.",
+    )
+    profile_obj = chatbot_service.profiles.get_profile(pid)
+    resp = chatbot_service.rag.query(
+        profile=profile_obj,
+        question="What is the input voltage?",
+        requested_language="ms",
+    )
+    assert resp.target_language == "ms"
+    assert resp.language_rule == "selector"
+    assert resp.language_confidence > 0.0
+
+
+def test_build_retrieval_query_does_not_prefix_full_length_chinese_question():
+    """1e: build_retrieval_query does not treat full-length Chinese question as follow-up."""
+    from app.core.rag import build_retrieval_query
+
+    history = [
+        {"role": "user", "content": "Tell me about the power specifications."},
+        {"role": "assistant", "content": "The system requires 24V DC."},
+    ]
+    full_cjk_q = "工业网关支持哪些无线通信协议和接口？"
+    query = build_retrieval_query(full_cjk_q, history=history)
+    # Must NOT prepend the previous user message
+    assert query == full_cjk_q
+    assert "power specifications" not in query
+
+    # Short CJK question (< 10 chars) should still be treated as follow-up
+    short_cjk_q = "接口呢"
+    query_short = build_retrieval_query(short_cjk_q, history=history)
+    assert query_short == f"Tell me about the power specifications. {short_cjk_q}"
+
+    cjk_warranty = "保修期呢"
+    query_cjk_warranty = build_retrieval_query(cjk_warranty, history=history)
+    assert query_cjk_warranty == f"Tell me about the power specifications. {cjk_warranty}"
+
+    # English short follow-up (<= 6 words or < 40 chars)
+    en_warranty = "What about the warranty period?"
+    query_en = build_retrieval_query(en_warranty, history=history)
+    assert query_en == f"Tell me about the power specifications. {en_warranty}"

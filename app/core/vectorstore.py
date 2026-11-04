@@ -234,8 +234,6 @@ class VectorStore:
         for text, meta in zip(docs, metas):
             meta_dict = meta or {}
             src = str(meta_dict.get("source_file") or "Unknown")
-            if src in seen_files and len(samples) >= limit:
-                continue
             if src not in seen_files:
                 seen_files.add(src)
                 samples.append(

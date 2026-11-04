@@ -75,6 +75,14 @@ class AppConfig:
             raise ValueError("keep_alive must be a non-empty duration string (e.g. '30m').")
 
 
+def _validate_embedding_device(val: Any) -> str:
+    if not isinstance(val, str) or val not in VALID_EMBEDDING_DEVICES:
+        raise ValidationError(
+            f"Invalid embedding_device '{val}'. Must be 'cpu' or 'auto'."
+        )
+    return val
+
+
 class AppSettings:
     """Mutable machine-wide runtime settings persisted to data/app_settings.json."""
 
@@ -85,12 +93,8 @@ class AppSettings:
         keep_alive: str = "30m",
         persist_path: Path | None = None,
     ) -> None:
-        if not isinstance(embedding_device, str) or embedding_device not in VALID_EMBEDDING_DEVICES:
-            raise ValidationError(
-                f"Invalid embedding_device '{embedding_device}'. Must be 'cpu' or 'auto'."
-            )
         self._lock = threading.Lock()
-        self._embedding_device: str = embedding_device
+        self._embedding_device: str = _validate_embedding_device(embedding_device)
         self._keep_alive: str = keep_alive
         self._persist_path: Path | None = persist_path
 
@@ -115,11 +119,7 @@ class AppSettings:
         if not isinstance(payload, dict) or "embedding_device" not in payload:
             raise ValidationError("embedding_device is required and must be 'cpu' or 'auto'.")
 
-        raw_device = payload["embedding_device"]
-        if not isinstance(raw_device, str) or raw_device not in VALID_EMBEDDING_DEVICES:
-            raise ValidationError(
-                f"Invalid embedding_device '{raw_device}'. Must be 'cpu' or 'auto'."
-            )
+        raw_device = _validate_embedding_device(payload["embedding_device"])
 
         with self._lock:
             self._embedding_device = raw_device
@@ -142,13 +142,12 @@ class AppSettings:
             try:
                 raw = json.loads(persist_path.read_text(encoding="utf-8"))
                 if isinstance(raw, dict) and "embedding_device" in raw:
-                    candidate = raw["embedding_device"]
-                    if isinstance(candidate, str) and candidate in VALID_EMBEDDING_DEVICES:
-                        embedding_device = candidate
-                    else:
+                    try:
+                        embedding_device = _validate_embedding_device(raw["embedding_device"])
+                    except ValidationError:
                         logger.warning(
                             "Ignoring invalid embedding_device %r in %s",
-                            candidate,
+                            raw["embedding_device"],
                             persist_path,
                         )
             except Exception as exc:
@@ -188,17 +187,20 @@ def load_config(config_path: Path | str | None = None) -> AppConfig:
     embedding_device = str(raw.get("embedding_device", "cpu")).strip()
     keep_alive = str(raw.get("keep_alive", "30m")).strip() or "30m"
 
+    defaults = AppConfig()
     return AppConfig(
         host=host,
-        port=int(raw.get("port", 8000)),
+        port=int(raw.get("port", defaults.port)),
         data_dir=data_dir,
         ollama_base_url=ollama_url,
-        default_chat_model=str(raw.get("default_chat_model", "qwen3.5:4b")).strip(),
-        default_embedding_model=str(
-            raw.get("default_embedding_model", "nomic-embed-text")
+        default_chat_model=str(
+            raw.get("default_chat_model", defaults.default_chat_model)
         ).strip(),
-        allow_chat_fallback=bool(raw.get("allow_chat_fallback", True)),
-        model_cache_ttl_seconds=float(raw.get("model_cache_ttl_seconds", 30.0)),
+        default_embedding_model=str(
+            raw.get("default_embedding_model", defaults.default_embedding_model)
+        ).strip(),
+        allow_chat_fallback=bool(raw.get("allow_chat_fallback", defaults.allow_chat_fallback)),
+        model_cache_ttl_seconds=float(raw.get("model_cache_ttl_seconds", defaults.model_cache_ttl_seconds)),
         embedding_device=embedding_device,
         keep_alive=keep_alive,
     )

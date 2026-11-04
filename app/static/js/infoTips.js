@@ -1,4 +1,4 @@
-import { SETTING_INFO_TIPS, SVG_ICONS } from "./constants.js";
+import { SETTING_INFO_TIPS } from "./constants.js";
 
 /**
  * infoTips.js - Accessible setting info tooltips (ⓘ).
@@ -97,7 +97,7 @@ function positionPopover(trigger, popover) {
   popover.style.visibility = "visible";
 }
 
-export function showPopover(trigger, pin = false) {
+function showPopover(trigger, pin = false) {
   clearHideTimer();
   const key = trigger.dataset.tipKey;
   const info = SETTING_INFO_TIPS[key];
@@ -131,7 +131,7 @@ export function showPopover(trigger, pin = false) {
   positionPopover(trigger, popoverEl);
 }
 
-export function hidePopover(immediate = false) {
+function hidePopover(immediate = false) {
   clearHideTimer();
   if (!popoverEl || popoverEl.hasAttribute("hidden")) {
     if (activeTrigger) {
@@ -215,54 +215,7 @@ export function initInfoTips() {
     }
   });
 
-  // Ensure every setting defined in SETTING_INFO_TIPS has an info-tip button
-  for (const [key, info] of Object.entries(SETTING_INFO_TIPS)) {
-    let btn = document.querySelector(`.info-tip-btn[data-tip-key="${key}"]`);
-    if (!btn) {
-      // Find label matching key
-      const labels = document.querySelectorAll(`label[for="${key}"]`);
-      let targetLabel = null;
-      for (const l of labels) {
-        if (!l.classList.contains("checkbox-row")) {
-          targetLabel = l;
-          break;
-        }
-      }
-      if (!targetLabel && labels.length > 0) {
-        targetLabel = labels[0];
-      }
-
-      if (targetLabel) {
-        btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "info-tip-btn";
-        btn.setAttribute("aria-label", `About ${info.title}`);
-        btn.setAttribute("aria-describedby", "info-tooltip-popover");
-        btn.setAttribute("aria-expanded", "false");
-        btn.dataset.tipKey = key;
-        btn.innerHTML = SVG_ICONS.info;
-
-        // If label is inside .field-label-row, append inside; else wrap or place after
-        const parentRow = targetLabel.closest(".field-label-row");
-        if (parentRow) {
-          parentRow.appendChild(btn);
-        } else {
-          const wrapper = document.createElement("div");
-          wrapper.className = "field-label-row";
-          targetLabel.parentNode.insertBefore(wrapper, targetLabel);
-          wrapper.appendChild(targetLabel);
-          wrapper.appendChild(btn);
-        }
-      }
-    }
-
-    if (btn && !btn._hasInfoTipBound) {
-      btn._hasInfoTipBound = true;
-      bindTriggerEvents(btn);
-    }
-  }
-
-  // Also bind any statically present buttons that match
+  // Bind all existing static info-tip buttons
   document.querySelectorAll(".info-tip-btn").forEach((btn) => {
     if (!btn._hasInfoTipBound) {
       btn._hasInfoTipBound = true;

@@ -2,7 +2,7 @@
 
 import { escapeHtml } from "./utils.js";
 
-export function expandCitationExpression(expr) {
+function expandCitationExpression(expr) {
   const indices = [];
   for (const rawPart of expr.split(",")) {
     const part = rawPart.trim();

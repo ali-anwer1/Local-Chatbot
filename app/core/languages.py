@@ -106,6 +106,7 @@ _DETECTOR = LanguageDetectorBuilder.from_languages(*_LINGUA_MAP.keys()).build()
 
 
 # Explicit in-text language request patterns (precedence 3b)
+# Every pattern strictly requires an answer/reply verb (§ Phase 1d)
 EXPLICIT_LANGUAGE_REQUEST_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # English
     (
@@ -113,9 +114,8 @@ EXPLICIT_LANGUAGE_REQUEST_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         re.compile(
             r"(?:"
             r"(?:answer|reply|respond|write)(?:\s+to\s+me)?\s+in\s+english|"
-            r"in\s+english\s+please|"
-            r"please\s+(?:answer|reply|respond)\s+in\s+english|"
-            r"use\s+english"
+            r"(?:please\s+)?(?:answer|reply|respond|write)\s+in\s+english|"
+            r"in\s+english\s*,\s*(?:please\s+)?(?:answer|reply|respond|write)"
             r")",
             re.IGNORECASE,
         ),
@@ -125,11 +125,8 @@ EXPLICIT_LANGUAGE_REQUEST_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "ms",
         re.compile(
             r"(?:"
-            r"(?:jawab|balas|tulis)(?:\s+dalam)?\s+bahasa\s+melayu|"
-            r"(?:jawab|balas|tulis)\s+dalam\s+melayu|"
-            r"(?:answer|reply|respond)\s+in\s+(?:malay|bahasa\s+melayu)|"
-            r"dalam\s+bahasa\s+melayu|"
-            r"sila\s+(?:jawab|balas)\s+dalam\s+bahasa\s+melayu"
+            r"(?:sila\s+|tolong\s+)?(?:jawab|balas|tulis)(?:\s+(?:kepada\s+saya|dalam))?\s+(?:bahasa\s+(?:melayu|malaysia)|melayu)|"
+            r"(?:answer|reply|respond|write)\s+in\s+(?:malay|bahasa\s+melayu|bahasa\s+malaysia)"
             r")",
             re.IGNORECASE,
         ),
@@ -139,9 +136,9 @@ EXPLICIT_LANGUAGE_REQUEST_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "zh",
         re.compile(
             r"(?:"
-            r"(?:用|以|请用|请以)?(?:中文|汉语|普通话|简体中文)(?:回答|回复|作答)?|"
-            r"(?:answer|reply|respond)\s+in\s+(?:chinese|mandarin|simplified\s+chinese)|"
-            r"please\s+(?:answer|reply)\s+in\s+chinese"
+            r"(?:请|请你)?(?:用|以)?(?:中文|汉语|普通话|简体中文)(?:来)?(?:回答|回复|作答)|"
+            r"(?:请|请你)?(?:回答|回复|作答)(?:用|以)?(?:中文|汉语|普通话|简体中文)|"
+            r"(?:please\s+)?(?:answer|reply|respond|write)\s+in\s+(?:chinese|mandarin|simplified\s+chinese)"
             r")",
             re.IGNORECASE,
         ),
@@ -151,8 +148,8 @@ EXPLICIT_LANGUAGE_REQUEST_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "ta",
         re.compile(
             r"(?:"
-            r"(?:answer|reply|respond)\s+in\s+tamil|"
-            r"தமிழில்\s+பதிலளிக்கவும்|தமிழில்\s+பதில்"
+            r"(?:answer|reply|respond|write)\s+in\s+tamil|"
+            r"தமிழில்\s+(?:பதிலளிக்கவும்|பதில்\s+அளிக்கவும்|பதில்\s+கூறவும்)"
             r")",
             re.IGNORECASE,
         ),
@@ -162,9 +159,8 @@ EXPLICIT_LANGUAGE_REQUEST_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "id",
         re.compile(
             r"(?:"
-            r"(?:jawab|balas|tulis)(?:\s+dalam)?\s+bahasa\s+indonesia|"
-            r"(?:answer|reply|respond)\s+in\s+indonesian|"
-            r"dalam\s+bahasa\s+indonesia"
+            r"(?:tolong\s+|silakan\s+)?(?:jawab|balas|tulis)(?:\s+(?:kepada\s+saya|dalam))?\s+(?:bahasa\s+indonesia|indonesia)|"
+            r"(?:answer|reply|respond|write)\s+in\s+indonesian"
             r")",
             re.IGNORECASE,
         ),
@@ -174,8 +170,8 @@ EXPLICIT_LANGUAGE_REQUEST_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "ja",
         re.compile(
             r"(?:"
-            r"(?:answer|reply|respond)\s+in\s+japanese|"
-            r"日本語で(?:答えて|返信して|回答して|お答えください)?"
+            r"(?:answer|reply|respond|write)\s+in\s+japanese|"
+            r"日本語で(?:答えて|返信して|回答して|お答えください)"
             r")",
             re.IGNORECASE,
         ),
@@ -185,8 +181,8 @@ EXPLICIT_LANGUAGE_REQUEST_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "ko",
         re.compile(
             r"(?:"
-            r"(?:answer|reply|respond)\s+in\s+korean|"
-            r"한국어로\s+(?:대답해|답변해|답해|작성해)"
+            r"(?:answer|reply|respond|write)\s+in\s+korean|"
+            r"한국어로\s+(?:대답해(?:주세요)?|답변해(?:주세요)?|답해(?:주세요)?|작성해(?:주세요)?)"
             r")",
             re.IGNORECASE,
         ),
@@ -196,8 +192,8 @@ EXPLICIT_LANGUAGE_REQUEST_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "ar",
         re.compile(
             r"(?:"
-            r"(?:answer|reply|respond)\s+in\s+arabic|"
-            r"(?:أجب|جاوب|الرد|باللغة)\s+بالعربية"
+            r"(?:answer|reply|respond|write)\s+in\s+arabic|"
+            r"(?:أجب|جاوب|رد)(?:\s+علي)?\s+(?:باللغة\s+العربية|بالعربية)"
             r")",
             re.IGNORECASE,
         ),

@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 import httpx
 
-from app.config import AppConfig, load_config
+from app.config import AppConfig, AppSettings, load_config
 from app.core.backends.ollama import OllamaBackend
 from app.core.service import ChatbotService
 from app.main import create_app
@@ -286,7 +286,10 @@ def test_ollama_backend_capability_detection_and_heuristic_fallback() -> None:
             return httpx.Response(200, json={"details": {"parameter_size": "7B"}})
         return httpx.Response(404)
 
-    backend = OllamaBackend(transport=httpx.MockTransport(handler))
+    backend = OllamaBackend(
+        transport=httpx.MockTransport(handler),
+        app_settings=AppSettings(),
+    )
     models = backend.list_models()
     by_name = {m["name"]: m for m in models}
 
@@ -316,7 +319,10 @@ def test_ollama_backend_disables_thinking_by_default_and_retries_legacy_400() ->
             )
         return httpx.Response(404)
 
-    backend = OllamaBackend(transport=httpx.MockTransport(handler))
+    backend = OllamaBackend(
+        transport=httpx.MockTransport(handler),
+        app_settings=AppSettings(),
+    )
 
     # 1. Default options -> think=False sent explicitly even before list_models() cache exists
     out1 = "".join(
@@ -324,7 +330,6 @@ def test_ollama_backend_disables_thinking_by_default_and_retries_legacy_400() ->
             messages=[{"role": "user", "content": "Hello"}],
             model="qwen3.5:4b",
             options={"temperature": 0.2},
-            stream=False,
         )
     )
     assert out1 == "Fast reply"
@@ -336,7 +341,6 @@ def test_ollama_backend_disables_thinking_by_default_and_retries_legacy_400() ->
             messages=[{"role": "user", "content": "Hello"}],
             model="qwen3.5:4b",
             options={"think": True},
-            stream=False,
         )
     )
     assert recorded_payloads[1]["think"] is True
@@ -347,7 +351,6 @@ def test_ollama_backend_disables_thinking_by_default_and_retries_legacy_400() ->
             messages=[{"role": "user", "content": "Hello"}],
             model="legacy-model",
             options={"think": False},
-            stream=False,
         )
     )
     assert out3 == "Fast reply"
@@ -383,23 +386,9 @@ def test_saved_chats_and_retry_history_api_routes(
     assert list_res.status_code == 200
     assert len(list_res.json()["chats"]) == 1
 
-    # Legacy ?session_id=... query parameter remains accepted (no 422) and ignored
-    get_legacy = client.get(f"/api/profiles/{pid}/chats/{chat_id}?session_id=api-sess")
-    assert get_legacy.status_code == 200
-    assert get_legacy.json()["title"] == "Maintenance Q&A"
-
     get_res = client.get(f"/api/profiles/{pid}/chats/{chat_id}")
     assert get_res.status_code == 200
     assert get_res.json()["title"] == "Maintenance Q&A"
-
-    # Legacy DELETE /history remains a no-op returning the same JSON shape
-    clear_res = client.delete(f"/api/profiles/{pid}/history?session_id=api-sess")
-    assert clear_res.status_code == 200
-    assert clear_res.json() == {
-        "cleared": True,
-        "profile_id": pid,
-        "session_id": "api-sess",
-    }
 
     # Client-supplied history in POST /chat reaches the assembled LLM prompt
     client.post(
@@ -582,7 +571,10 @@ def test_embed_device_cpu_vs_auto_keep_alive_and_done_timings(
         embedding_device="cpu",
         keep_alive="30m",
     )
-    ollama = OllamaBackend(transport=httpx.MockTransport(handler))
+    ollama = OllamaBackend(
+        transport=httpx.MockTransport(handler),
+        app_settings=AppSettings.from_config(cfg),
+    )
     svc = ChatbotService(config=cfg, backend=ollama)
     client = TestClient(create_app(svc))
 

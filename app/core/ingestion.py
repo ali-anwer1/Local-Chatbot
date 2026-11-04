@@ -184,9 +184,7 @@ def parse_docx(data: bytes, filename: str) -> ParseResult:
             if style_name.startswith("heading") or style_name == "title":
                 flush_section()
                 current_section = text
-                buffer.append(text)
-            else:
-                buffer.append(text)
+            buffer.append(text)
         elif isinstance(block, Table):
             table_lines: list[str] = []
             for row in block.rows:
@@ -229,9 +227,7 @@ def parse_markdown(data: bytes, filename: str) -> ParseResult:
         if match:
             flush()
             current_section = match.group(2).strip()
-            buffer.append(line)
-        else:
-            buffer.append(line)
+        buffer.append(line)
 
     flush()
     return ParseResult(segments=segments)
@@ -262,22 +258,19 @@ def parse_document(data: bytes, filename: str) -> ParseResult:
     return parse_txt(data, filename)
 
 
-def _split_Into_atomic_pieces(text: str, chunk_size: int, separators: list[str]) -> list[str]:
+def _split_into_atomic_pieces(text: str, chunk_size: int, separators: list[str]) -> list[str]:
     """Recursively break text into pieces no larger than chunk_size."""
     if len(text) <= chunk_size:
         return [text] if text else []
 
-    if not separators:
+    if not separators or separators[0] == "":
         return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
 
     sep = separators[0]
     next_seps = separators[1:]
 
-    if sep == "":
-        return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
-
     if sep not in text:
-        return _split_Into_atomic_pieces(text, chunk_size, next_seps)
+        return _split_into_atomic_pieces(text, chunk_size, next_seps)
 
     raw_parts = text.split(sep)
     pieces: list[str] = []
@@ -289,7 +282,7 @@ def _split_Into_atomic_pieces(text: str, chunk_size: int, separators: list[str])
         if len(piece) <= chunk_size:
             pieces.append(piece)
         else:
-            pieces.extend(_split_Into_atomic_pieces(piece, chunk_size, next_seps))
+            pieces.extend(_split_into_atomic_pieces(piece, chunk_size, next_seps))
     return pieces
 
 
@@ -308,7 +301,7 @@ def recursive_split_text(
 
     effective_overlap = max(0, min(chunk_overlap, chunk_size - 1))
     seps = separators if separators is not None else DEFAULT_SEPARATORS
-    atomic_pieces = _split_Into_atomic_pieces(cleaned, chunk_size, seps)
+    atomic_pieces = _split_into_atomic_pieces(cleaned, chunk_size, seps)
 
     chunks: list[str] = []
     current_pieces: list[str] = []

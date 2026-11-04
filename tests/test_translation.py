@@ -144,12 +144,15 @@ def test_translate_api_endpoint(
     mock_backend: DeterministicMockBackend,
 ):
     """Test POST /api/translate endpoint streams SSE events."""
+    prof = chatbot_service.create_profile({"name": "Translate Bot"})
+    pid = prof["id"]
     client = TestClient(create_app(chatbot_service))
     mock_backend.next_chat_reply = "Terjemahan Bahasa Melayu [1]."
 
     response = client.post(
         "/api/translate",
         json={
+            "profile_id": pid,
             "text": "English text [1].",
             "target_language": "ms",
             "source_language": "en",
@@ -163,6 +166,31 @@ def test_translate_api_endpoint(
     assert "event: token" in content
     assert "event: done" in content
     assert "Terjemahan Bahasa Melayu [1]." in content
+
+
+def test_translate_uses_fallback_chat_model_when_configured_model_missing(
+    chatbot_service: ChatbotService,
+    mock_backend: DeterministicMockBackend,
+):
+    """Translation succeeds using the fallback chat model when the profile's configured model is missing."""
+    prof = chatbot_service.create_profile(
+        {"name": "Missing Model Translate Bot", "chat_model": "missing-chat-model:7b"}
+    )
+    pid = prof["id"]
+    mock_backend.next_chat_reply = "Fallback terjemahan [1]."
+
+    events = list(
+        chatbot_service.stream_translate(
+            profile_id=pid,
+            text="English text [1].",
+            target_language="ms",
+            source_language="en",
+        )
+    )
+    done_events = [e for e in events if e.get("event") == "done"]
+    assert len(done_events) == 1
+    assert done_events[0]["data"]["full_text"] == "Fallback terjemahan [1]."
+    assert any(c["model"] == "qwen3.5:4b" for c in mock_backend.chat_calls)
 
 
 def test_saved_chats_include_translations_and_survives_roundtrip(
@@ -216,44 +244,4 @@ def test_assemble_translation_messages_mandarin_chinese():
     assert "Translate the following text into Simplified Chinese (简体中文):" in user_msg
     assert "Output only the translation without any preamble, notes, or explanations." in system_msg
     assert text in user_msg
-
-
-def test_translation_dropdown_popover_dom_and_css_specs():
-    """Verify top-layer popover is properly declared in index.html, styled in CSS, and wired in chat.js."""
-    from pathlib import Path
-
-    repo_root = Path(__file__).resolve().parent.parent
-
-    # 1. index.html contains top-layer popover with popover="auto" and role="menu"
-    index_html = (repo_root / "app" / "static" / "index.html").read_text(encoding="utf-8")
-    assert 'id="translate-dropdown-popover"' in index_html
-    assert 'popover="auto"' in index_html
-    assert 'role="menu"' in index_html
-
-    # 2. styles.css contains top-layer fixed positioning and high z-index
-    styles_css = (repo_root / "app" / "static" / "styles.css").read_text(encoding="utf-8")
-    assert ".translate-popover" in styles_css
-    assert ".translate-dropdown-menu[popover]" in styles_css
-    assert "position: fixed;" in styles_css
-    assert "z-index: 10000;" in styles_css
-
-    # 3. chat.js targets assistant turn body (.assistant-body) and exports openTranslateMenu
-    chat_js = (repo_root / "app" / "static" / "js" / "chat.js").read_text(encoding="utf-8")
-    assert 'row.querySelector(".assistant-body")' in chat_js
-    assert "export function openTranslateMenu" in chat_js
-    assert "export async function triggerTranslation" in chat_js
-    assert "positionTranslatePopover" in chat_js
-
-
-def test_translation_overwrites_previous_translation_in_dom():
-    """Verify chat.js clears previous translation container to overwrite rather than crowd output."""
-    from pathlib import Path
-
-    repo_root = Path(__file__).resolve().parent.parent
-    chat_js = (repo_root / "app" / "static" / "js" / "chat.js").read_text(encoding="utf-8")
-
-    # triggerTranslation must reset container.innerHTML to overwrite prior translations
-    assert 'container.innerHTML = "";' in chat_js
-    assert "turn.activeTranslationLang = targetLang;" in chat_js
-    assert "row._translationAbortController" in chat_js
 

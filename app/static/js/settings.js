@@ -55,7 +55,7 @@ export function renderSettingsForm(prof, opts = {}) {
   el.settingChunkOverlap.value = prof.chunk_overlap ?? 150;
   el.settingHistoryTurns.value = prof.history_turns ?? 4;
   const refusalMsgs = prof.refusal_messages || {};
-  el.settingRefusalMsg.value = refusalMsgs.en || prof.refusal_message || "";
+  el.settingRefusalMsg.value = refusalMsgs.en || "";
   document.querySelectorAll(".refusal-lang-fields input[data-lang]").forEach((input) => {
     const lang = input.dataset.lang;
     input.value = refusalMsgs[lang] || "";
@@ -139,7 +139,6 @@ export function collectSettingsPayload() {
     chunk_size: parseInt(el.settingChunkSize.value, 10),
     chunk_overlap: parseInt(el.settingChunkOverlap.value, 10),
     history_turns: parseInt(el.settingHistoryTurns.value, 10),
-    refusal_message: el.settingRefusalMsg.value.trim(),
     refusal_messages: refusalMessages,
   };
 }

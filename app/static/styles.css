@@ -334,12 +334,6 @@
     flex-shrink: 0;
   }
 
-  .icon-lg {
-    inline-size: 20px;
-    block-size: 20px;
-    flex-shrink: 0;
-  }
-
   /* Icon Buttons */
   .icon-btn {
     inline-size: 28px;
@@ -405,12 +399,6 @@
   .btn.primary:hover:not(:disabled) {
     background-color: var(--accent-primary-hover);
     border-color: var(--accent-primary-hover);
-  }
-
-  .btn.secondary {
-    background-color: var(--bg-surface);
-    border-color: var(--border-strong);
-    color: var(--text-primary);
   }
 
   .btn.subtle {

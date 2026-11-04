@@ -64,14 +64,20 @@ import {
 export async function refreshAll(forceRefresh = false) {
   const query = forceRefresh ? "?refresh=true" : "";
   try {
-    const [health, profilesData, appSettings] = await Promise.all([
+    const [health, profilesData, appSettings, languages] = await Promise.all([
       apiJson(`/api/health${query}`),
       apiJson("/api/profiles"),
       apiJson("/api/app-settings"),
+      apiJson("/api/languages"),
     ]);
     state.health = health;
     state.profiles = profilesData.profiles || [];
     state.appSettings = appSettings;
+    if (Array.isArray(languages)) {
+      state.languages = languages;
+      state.languagesByCode = Object.fromEntries(languages.map((l) => [l.code, l]));
+      populateLanguageElements(languages);
+    }
 
     if (
       state.activeProfileId &&
@@ -99,6 +105,56 @@ export async function refreshAll(forceRefresh = false) {
     el.ollamaStatusText.textContent = "Server error";
     el.globalBannerText.textContent = err.message || "Failed to connect to local server.";
     el.globalBanner.hidden = false;
+  }
+}
+
+function populateLanguageElements(languages) {
+  if (!Array.isArray(languages)) return;
+
+  // 1. Composer Answer-in select
+  if (el.selectAnswerLanguage) {
+    const prev = el.selectAnswerLanguage.value || "auto";
+    el.selectAnswerLanguage.innerHTML =
+      '<option value="auto">Answer in: Auto ▾</option>' +
+      languages
+        .map((l) => `<option value="${l.code}">${l.native_name}</option>`)
+        .join("");
+    el.selectAnswerLanguage.value = prev;
+  }
+
+  // 2. Default-language select in settings
+  if (el.settingDefaultLanguage) {
+    const prev = el.settingDefaultLanguage.value;
+    el.settingDefaultLanguage.innerHTML = languages
+      .map((l) => `<option value="${l.code}">${l.native_name}</option>`)
+      .join("");
+    if (prev) {
+      el.settingDefaultLanguage.value = prev;
+    }
+  }
+
+  // 3. Per-language refusal inputs
+  const refusalContainer = document.querySelector(".refusal-lang-fields");
+  if (refusalContainer) {
+    const nonEnglish = languages.filter((l) => l.code !== "en");
+    const currentValues = {};
+    refusalContainer.querySelectorAll("input[data-lang]").forEach((input) => {
+      currentValues[input.dataset.lang] = input.value;
+    });
+    refusalContainer.innerHTML = nonEnglish
+      .map(
+        (l) => `
+      <div class="subfield-group">
+        <label for="setting-refusal-${l.code}">${l.native_name}</label>
+        <input type="text" id="setting-refusal-${l.code}" data-lang="${l.code}" maxlength="240">
+      </div>`
+      )
+      .join("");
+    refusalContainer.querySelectorAll("input[data-lang]").forEach((input) => {
+      if (currentValues[input.dataset.lang]) {
+        input.value = currentValues[input.dataset.lang];
+      }
+    });
   }
 }
 
@@ -448,12 +504,6 @@ function bindEvents() {
 
   // New Chat / Clear Chat
   el.btnClearChat.addEventListener("click", startNewChat);
-  if (el.btnSidebarNewChat) {
-    el.btnSidebarNewChat.addEventListener("click", startNewChat);
-  }
-  if (el.btnHeaderNewChat) {
-    el.btnHeaderNewChat.addEventListener("click", startNewChat);
-  }
 
   // Save Chat & Export .md (#10)
   el.btnSaveChat.addEventListener("click", () => {

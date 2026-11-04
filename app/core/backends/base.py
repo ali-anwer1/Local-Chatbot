@@ -9,6 +9,15 @@ from typing import Any
 
 EMBEDDING_NAME_KEYWORDS = ("embed", "bge", "e5", "minilm")
 
+OLLAMA_CHAT_STAT_KEYS = (
+    "prompt_eval_count",
+    "prompt_eval_duration",
+    "eval_count",
+    "eval_duration",
+    "total_duration",
+    "load_duration",
+)
+
 
 def format_bytes(size_bytes: int | None) -> str:
     """Format byte size into human-readable disk usage (e.g. '2.6 GB', '274 MB')."""
@@ -84,7 +93,7 @@ class LLMBackend(ABC):
         messages: list[dict[str, str]],
         model: str,
         options: dict[str, Any] | None = None,
-        stream: bool = True,
+        stats: dict[str, Any] | None = None,
     ) -> Iterator[str]:
         """Generate or stream chat completion tokens."""
 
@@ -93,13 +102,5 @@ class LLMBackend(ABC):
         """Generate embedding vectors for a batch of input strings."""
 
     @abstractmethod
-    def model_info(self, model: str) -> dict[str, Any]:
-        """Return size on disk, parameter count, quantization, and capabilities."""
-
-    @abstractmethod
     def pull_model(self, model: str) -> Iterator[dict[str, Any]]:
         """Download a model with streaming progress events (user-initiated only)."""
-
-    def get_last_chat_stats(self) -> dict[str, Any] | None:
-        """Return token and duration stats from the most recent chat() call, if available."""
-        return getattr(self, "_last_chat_stats", None)

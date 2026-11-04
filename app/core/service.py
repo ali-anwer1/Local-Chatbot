@@ -20,6 +20,12 @@ from app.core.ingestion import (
     compute_sha256,
     parse_document,
 )
+from app.core.languages import (
+    LANGUAGE_BY_CODE,
+    SUPPORTED_LANGUAGES,
+    SUPPORTED_LANGUAGE_CODES,
+    assemble_translation_messages,
+)
 from app.core.profiles import DocumentRecord, Profile, ProfileManager
 from app.core.rag import RAGEngine
 from app.core.vectorstore import VectorStore
@@ -32,9 +38,15 @@ class ChatbotService:
         self,
         config: AppConfig,
         backend: LLMBackend | None = None,
+        *,
+        app_settings: AppSettings | None = None,
     ) -> None:
         self.config = config
-        self.app_settings = AppSettings.from_config(config)
+        self.app_settings = (
+            app_settings
+            or getattr(backend, "app_settings", None)
+            or AppSettings.from_config(config)
+        )
         if backend is None:
             self.backend: LLMBackend = OllamaBackend(
                 base_url=config.ollama_base_url,
@@ -42,10 +54,6 @@ class ChatbotService:
             )
         else:
             self.backend = backend
-            if hasattr(self.backend, "bind_app_settings") and getattr(
-                self.backend, "_app_settings", None
-            ) is None:
-                self.backend.bind_app_settings(self.app_settings)
         self.profiles = ProfileManager(
             config.data_dir,
             default_chat_model=config.default_chat_model,
@@ -67,7 +75,6 @@ class ChatbotService:
 
     def list_languages(self) -> list[dict[str, Any]]:
         """Return the supported languages definition list."""
-        from app.core.languages import SUPPORTED_LANGUAGES
         return [l.to_dict() for l in SUPPORTED_LANGUAGES]
 
     def update_app_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -80,26 +87,6 @@ class ChatbotService:
 
     def get_health(self, *, force_refresh: bool = False) -> dict[str, Any]:
         return self.availability.get_system_status(force_refresh=force_refresh)
-
-    def list_models(self, *, force_refresh: bool = False) -> dict[str, Any]:
-        status = self.availability.get_system_status(force_refresh=force_refresh)
-        if not status["ollama_reachable"]:
-            return {
-                "ollama_reachable": False,
-                "ollama_url": status["ollama_url"],
-                "message": status["banner_message"],
-                "models": [],
-                "completion_models": [],
-                "embedding_models": [],
-            }
-        return {
-            "ollama_reachable": True,
-            "ollama_url": status["ollama_url"],
-            "no_models_installed": status["no_models_installed"],
-            "models": status["models"],
-            "completion_models": status["completion_models"],
-            "embedding_models": status["embedding_models"],
-        }
 
     def pull_model(self, model: str) -> Iterator[dict[str, Any]]:
         """Stream user-initiated model download and refresh model cache when complete."""
@@ -422,9 +409,6 @@ class ChatbotService:
 
     # --- Chat ---
 
-    def clear_history(self, profile_id: str, session_id: str = "default") -> None:
-        """Retained as a no-op; conversation history is owned by the browser."""
-
     def stream_chat(
         self,
         profile_id: str,
@@ -453,35 +437,21 @@ class ChatbotService:
         *,
         text: str,
         target_language: str,
+        profile_id: str,
         source_language: str | None = None,
-        profile_id: str | None = None,
     ) -> Iterator[dict[str, Any]]:
         """Stream translation of an answer using the profile's chat model (§ Part 2).
 
         No retrieval or refusal gate is invoked. Uses temperature 0.1 and think: false.
         """
-        from app.core.languages import (
-            LANGUAGE_BY_CODE,
-            SUPPORTED_LANGUAGE_CODES,
-            assemble_translation_messages,
-        )
-
         cleaned_text = text.strip()
         if not cleaned_text:
             raise ValidationError("Text to translate cannot be empty.")
         if target_language not in SUPPORTED_LANGUAGE_CODES:
             raise ValidationError(f"Target language '{target_language}' is not supported.")
 
-        if profile_id:
-            profile = self.profiles.get_profile(profile_id)
-            chat_model = profile.chat_model
-        else:
-            profiles = self.profiles.list_profiles()
-            chat_model = (
-                profiles[0]["chat_model"]
-                if profiles
-                else self.config.default_chat_model
-            )
+        profile = self.profiles.get_profile(profile_id)
+        chat_model = self.availability.require_ready_for_chat(profile, self.vectorstore)[0]
 
         target_entry = LANGUAGE_BY_CODE[target_language]
         yield {
@@ -503,7 +473,6 @@ class ChatbotService:
             messages=messages,
             model=chat_model,
             options={"temperature": 0.1, "think": False},
-            stream=True,
         ):
             tokens.append(token)
             yield {"event": "token", "data": {"text": token}}
@@ -522,8 +491,8 @@ class ChatbotService:
         *,
         text: str,
         target_language: str,
+        profile_id: str,
         source_language: str | None = None,
-        profile_id: str | None = None,
     ) -> dict[str, Any]:
         """Synchronous wrapper for stream_translate for tests and CLI."""
         tokens: list[str] = []
@@ -531,8 +500,8 @@ class ChatbotService:
         for ev in self.stream_translate(
             text=text,
             target_language=target_language,
-            source_language=source_language,
             profile_id=profile_id,
+            source_language=source_language,
         ):
             if ev["event"] == "token":
                 tokens.append(ev["data"].get("text", ""))

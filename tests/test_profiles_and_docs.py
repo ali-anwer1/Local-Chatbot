@@ -14,8 +14,9 @@ from app.core.errors import (
     ProfileNotFoundError,
     ReindexConfirmationRequiredError,
 )
+from app.config import atomic_write_json
 from app.core.ingestion import SCANNED_PDF_WARNING
-from app.core.profiles import Profile, _atomic_write_json, describe_profile_changes
+from app.core.profiles import Profile, describe_profile_changes
 from app.core.service import ChatbotService
 from tests.conftest import DeterministicMockBackend
 
@@ -328,11 +329,11 @@ def test_atomic_json_writes_and_corrupt_profile_warning_log(
 ) -> None:
     """Failed JSON writes preserve existing file without leftover temp files; corrupt profiles log a warning."""
     target = tmp_path / "sample.json"
-    _atomic_write_json(target, {"status": "original"})
+    atomic_write_json(target, {"status": "original"})
     assert '"original"' in target.read_text(encoding="utf-8")
 
     with pytest.raises(TypeError):
-        _atomic_write_json(target, {"bad": object()})
+        atomic_write_json(target, {"bad": object()})
 
     assert '"original"' in target.read_text(encoding="utf-8")
     assert list(tmp_path.glob("*.tmp")) == []
@@ -361,7 +362,6 @@ def test_describe_profile_changes_pinned_strings_and_with_updates() -> None:
         temperature=0.20,
         top_k=5,
         similarity_threshold=0.50,
-        refusal_message="Old refusal",
         chunk_size=1000,
         chunk_overlap=150,
         history_turns=4,
@@ -388,7 +388,7 @@ def test_describe_profile_changes_pinned_strings_and_with_updates() -> None:
             "chunk_size": "1200",
             "chunk_overlap": "200",
             "history_turns": "6",
-            "refusal_message": " New refusal ",
+            "refusal_messages": {"en": " New refusal "},
             "enable_thinking": 1,
         }
     )
@@ -410,9 +410,26 @@ def test_describe_profile_changes_pinned_strings_and_with_updates() -> None:
         "Chunk Size (1000 → 1200)",
         "Chunk Overlap (150 → 200)",
         "History Turns (4 → 6)",
-        "Refusal Message",
+        "Refusal messages",
         "Thinking Mode (On)",
     ]
 
     toggled_off = after.with_updates({"enable_thinking": False, "temperature": 0.4502})
     assert describe_profile_changes(after, toggled_off) == ["Thinking Mode (Off)"]
+
+
+def test_editing_only_non_english_refusal_message_records_change(
+    chatbot_service: ChatbotService,
+):
+    """1g: Editing only a non-English refusal message records 'Refusal messages' in history."""
+    prof = chatbot_service.create_profile({"name": "Refusal Bot"})
+    pid = prof["id"]
+    ms_refusal_new = "Maaf, maklumat tiada dalam pangkalan pengetahuan."
+    updated_prof = chatbot_service.update_profile(
+        pid,
+        {"refusal_messages": {"ms": ms_refusal_new}},
+    )
+    history = updated_prof["settings_history"]
+    assert len(history) >= 1
+    latest_entry = history[-1]
+    assert "Refusal messages" in latest_entry["changes"]

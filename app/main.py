@@ -40,7 +40,6 @@ class ProfilePayload(BaseModel):
     temperature: float | None = None
     top_k: int | None = None
     similarity_threshold: float | None = None
-    refusal_message: str | None = None
     chunk_size: int | None = None
     chunk_overlap: int | None = None
     history_turns: int | None = None
@@ -52,7 +51,6 @@ class ProfilePayload(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    session_id: str = "default"
     history: list[dict[str, str]] | None = None
     options: dict[str, Any] | None = Field(default=None)
     requested_language: str | None = None
@@ -61,8 +59,8 @@ class ChatRequest(BaseModel):
 class TranslateRequest(BaseModel):
     text: str
     target_language: str
+    profile_id: str
     source_language: str | None = None
-    profile_id: str | None = None
 
 
 class SaveChatRequest(BaseModel):
@@ -199,10 +197,6 @@ def create_app(service: ChatbotService | None = None) -> FastAPI:
     def get_languages() -> list[dict[str, Any]]:
         return svc.list_languages()
 
-    @app.get("/api/models")
-    def get_models(refresh: bool = Query(default=False)) -> dict[str, Any]:
-        return svc.list_models(force_refresh=refresh)
-
     @app.post("/api/models/pull")
     def pull_model(body: PullModelRequest) -> StreamingResponse:
         if not body.confirmed:
@@ -291,9 +285,7 @@ def create_app(service: ChatbotService | None = None) -> FastAPI:
     def get_saved_chat(
         profile_id: str,
         chat_id: str,
-        session_id: str | None = Query(default=None),
     ) -> dict[str, Any]:
-        del session_id  # Accepted for backward compatibility; ignored
         return svc.get_saved_chat(profile_id, chat_id)
 
     @app.delete("/api/profiles/{profile_id}/chats/{chat_id}")
@@ -322,13 +314,6 @@ def create_app(service: ChatbotService | None = None) -> FastAPI:
             profile_id=body.profile_id,
         )
         return _stream_sse_with_priming(events)
-
-    @app.delete("/api/profiles/{profile_id}/history")
-    def clear_history(
-        profile_id: str, session_id: str = Query(default="default")
-    ) -> dict[str, Any]:
-        svc.clear_history(profile_id, session_id)
-        return {"cleared": True, "profile_id": profile_id, "session_id": session_id}
 
     return app
 

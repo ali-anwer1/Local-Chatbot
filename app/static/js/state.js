@@ -4,6 +4,8 @@ export const state = {
   health: null,
   appSettings: { embedding_device: "cpu", keep_alive: "30m" },
   profiles: [],
+  languages: [],
+  languagesByCode: {},
   activeProfileId: null,
   activeProfile: null,
   documents: [],

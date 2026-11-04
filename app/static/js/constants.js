@@ -21,21 +21,6 @@ export const SVG_ICONS = {
   info: `<svg class="icon info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>`,
 };
 
-export const SUPPORTED_LANGUAGES = [
-  { code: "en", name: "English", nativeName: "English" },
-  { code: "ms", name: "Malay", nativeName: "Bahasa Melayu" },
-  { code: "zh", name: "Simplified Chinese", nativeName: "简体中文" },
-  { code: "ta", name: "Tamil", nativeName: "தமிழ்" },
-  { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia" },
-  { code: "ja", name: "Japanese", nativeName: "日本語" },
-  { code: "ko", name: "Korean", nativeName: "한국어" },
-  { code: "ar", name: "Arabic", nativeName: "العربية" },
-];
-
-export const SUPPORTED_LANG_MAP = Object.fromEntries(
-  SUPPORTED_LANGUAGES.map((l) => [l.code, l])
-);
-
 export const SETTING_INFO_TIPS = {
   "setting-name": {
     title: "Display name",
@@ -97,20 +82,13 @@ export const SETTING_INFO_TIPS = {
     title: "Refusal message in other languages",
     text: "The message shown when an answer cannot be found, customized for each supported language. If left empty, default translations are used.",
   },
-  "new-profile-name": {
-    title: "Display name",
-    text: "Name shown in the sidebar and chat header. Cosmetic only.",
-  },
-  "new-profile-preamble": {
-    title: "System preamble",
-    text: "Instructions sent to the model before every conversation: the bot's role, tone and scope. It does not add knowledge — facts must come from the uploaded documents.",
-  },
-  "new-profile-chat-model": {
-    title: "Chat model",
-    text: "The model that writes the answers. Larger models usually answer better but are slower and use more memory.",
-  },
-  "new-profile-embed-model": {
-    title: "Embedding model",
-    text: "Turns documents and questions into vectors so relevant passages can be found. Documents and questions must use the same embedding model, so changing it re-indexes every document.",
-  },
+  "new-profile-name": null,
+  "new-profile-preamble": null,
+  "new-profile-chat-model": null,
+  "new-profile-embed-model": null,
 };
+
+SETTING_INFO_TIPS["new-profile-name"] = SETTING_INFO_TIPS["setting-name"];
+SETTING_INFO_TIPS["new-profile-preamble"] = SETTING_INFO_TIPS["setting-preamble"];
+SETTING_INFO_TIPS["new-profile-chat-model"] = SETTING_INFO_TIPS["setting-chat-model"];
+SETTING_INFO_TIPS["new-profile-embed-model"] = SETTING_INFO_TIPS["setting-embedding-model"];

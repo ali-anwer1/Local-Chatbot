@@ -10,10 +10,10 @@ import os
 from pathlib import Path
 import re
 import shutil
-import tempfile
 from typing import Any
 import uuid
 
+from app.config import AppConfig, atomic_write_json
 from app.core.errors import (
     ChatNotFoundError,
     DocumentNotFoundError,
@@ -30,29 +30,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_REFUSAL_MESSAGE = DEFAULT_REFUSAL_MESSAGES["en"]
 MAX_SETTINGS_HISTORY_ENTRIES = 10
-
-
-def _atomic_write_json(path: Path, data: Any) -> None:
-    """Write JSON atomically via a temp file in the same directory and os.replace."""
-    tmp_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as fh:
-            tmp_path = Path(fh.name)
-            json.dump(data, fh, indent=2, ensure_ascii=False)
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.replace(tmp_path, path)
-    except BaseException:
-        if tmp_path is not None:
-            tmp_path.unlink(missing_ok=True)
-        raise
 
 
 def _utc_now_iso() -> str:
@@ -80,7 +57,12 @@ def _coerce_raw_str(val: Any) -> str:
     return "" if val is None else str(val)
 
 
-def _coerce_refusal_messages(val: Any) -> dict[str, str]:
+def _coerce_default_language(val: Any) -> str:
+    s = "" if val is None else str(val).strip().lower()
+    return s if s in SUPPORTED_LANGUAGE_CODES else "en"
+
+
+def _coerce_refusal_messages(val: Any, legacy_refusal: Any = None) -> dict[str, str]:
     merged = dict(DEFAULT_REFUSAL_MESSAGES)
     if isinstance(val, dict):
         for k, v in val.items():
@@ -88,6 +70,10 @@ def _coerce_refusal_messages(val: Any) -> dict[str, str]:
                 s = str(v).strip()
                 if s:
                     merged[k] = s
+    if legacy_refusal is not None:
+        s = str(legacy_refusal).strip()
+        if s:
+            merged["en"] = s
     return merged
 
 
@@ -99,12 +85,11 @@ _PROFILE_MUTABLE_COERCERS: dict[str, Any] = {
     "temperature": float,
     "top_k": int,
     "similarity_threshold": float,
-    "refusal_message": _coerce_stripped_str,
     "chunk_size": int,
     "chunk_overlap": int,
     "history_turns": int,
     "enable_thinking": bool,
-    "default_language": _coerce_stripped_str,
+    "default_language": _coerce_default_language,
     "refusal_messages": _coerce_refusal_messages,
 }
 
@@ -124,12 +109,11 @@ class Profile:
     id: str
     name: str = "Untitled Bot"
     preamble: str = ""
-    chat_model: str = "qwen3.5:4b"
-    embedding_model: str = "nomic-embed-text"
+    chat_model: str = AppConfig.default_chat_model
+    embedding_model: str = AppConfig.default_embedding_model
     temperature: float = 0.2
     top_k: int = 5
     similarity_threshold: float = 0.5
-    refusal_message: str = DEFAULT_REFUSAL_MESSAGE
     chunk_size: int = 1000
     chunk_overlap: int = 150
     history_turns: int = 4
@@ -162,16 +146,12 @@ class Profile:
         if not (0 <= self.history_turns <= 20):
             raise ValidationError("history_turns must be between 0 and 20.")
         if not self.default_language or self.default_language not in SUPPORTED_LANGUAGE_CODES:
-            self.default_language = "en"
+            raise ValidationError(f"Invalid default language '{self.default_language}'.")
         if not isinstance(self.refusal_messages, dict):
-            self.refusal_messages = dict(DEFAULT_REFUSAL_MESSAGES)
+            raise ValidationError("refusal_messages must be a dictionary.")
         for code in SUPPORTED_LANGUAGE_CODES:
             if not self.refusal_messages.get(code) or not self.refusal_messages[code].strip():
-                self.refusal_messages[code] = DEFAULT_REFUSAL_MESSAGES[code]
-        if not self.refusal_message or not self.refusal_message.strip():
-            self.refusal_message = self.refusal_messages.get("en", DEFAULT_REFUSAL_MESSAGE)
-        else:
-            self.refusal_messages["en"] = self.refusal_message
+                raise ValidationError(f"Missing refusal message for language '{code}'.")
 
     def get_refusal_message(self, lang_code: str) -> str:
         """Return the refusal message for the given language code, falling back gracefully."""
@@ -182,25 +162,17 @@ class Profile:
             or DEFAULT_REFUSAL_MESSAGE
         )
 
+    @property
+    def refusal_message(self) -> str:
+        """Backward-compatible read-only access to English refusal message."""
+        return self.get_refusal_message("en")
+
     def with_updates(self, payload: dict[str, Any]) -> Profile:
         """Return a copy with coerced mutable fields updated, ignoring unknown/immutable keys."""
         updates: dict[str, Any] = {}
         for key, val in payload.items():
             if key in _PROFILE_MUTABLE_COERCERS and val is not None:
                 updates[key] = _PROFILE_MUTABLE_COERCERS[key](val)
-
-        # Synchronize refusal_message string and refusal_messages dict
-        if "refusal_messages" in updates:
-            ref_dict = dict(updates["refusal_messages"])
-            if "refusal_message" in updates:
-                ref_dict["en"] = updates["refusal_message"]
-            else:
-                updates["refusal_message"] = ref_dict.get("en", self.refusal_message)
-            updates["refusal_messages"] = ref_dict
-        elif "refusal_message" in updates:
-            ref_dict = dict(self.refusal_messages)
-            ref_dict["en"] = updates["refusal_message"]
-            updates["refusal_messages"] = ref_dict
 
         return replace(
             self,
@@ -216,35 +188,28 @@ class Profile:
         cls,
         data: dict[str, Any],
         *,
-        default_chat_model: str = "qwen3.5:4b",
-        default_embedding_model: str = "nomic-embed-text",
+        default_chat_model: str = AppConfig.default_chat_model,
+        default_embedding_model: str = AppConfig.default_embedding_model,
     ) -> Profile:
         now = _utc_now_iso()
         raw_hist = data.get("settings_history")
         hist = [item for item in raw_hist if isinstance(item, dict)] if isinstance(raw_hist, list) else []
 
-        # Migration logic: populate per-language refusal messages from legacy single refusal_message
-        migrated_refusals = dict(DEFAULT_REFUSAL_MESSAGES)
-        raw_refusals = data.get("refusal_messages")
-        if isinstance(raw_refusals, dict):
-            for code, msg in raw_refusals.items():
-                if code in SUPPORTED_LANGUAGE_CODES and msg:
-                    migrated_refusals[code] = str(msg).strip()
-        raw_single_refusal = data.get("refusal_message")
-        if raw_single_refusal and str(raw_single_refusal).strip():
-            migrated_refusals["en"] = str(raw_single_refusal).strip()
+        migrated_refusals = _coerce_refusal_messages(
+            data.get("refusal_messages"),
+            legacy_refusal=data.get("refusal_message"),
+        )
+        default_lang = _coerce_default_language(data.get("default_language"))
 
-        default_lang = str(data.get("default_language") or "en").strip().lower()
-        if default_lang not in SUPPORTED_LANGUAGE_CODES:
-            default_lang = "en"
+        chat_model = str(data.get("chat_model") or default_chat_model).strip()
+        embedding_model = str(data.get("embedding_model") or default_embedding_model).strip()
 
         base = cls(
             id=str(data["id"]),
-            chat_model=default_chat_model,
-            embedding_model=default_embedding_model,
+            chat_model=chat_model,
+            embedding_model=embedding_model,
             default_language=default_lang,
             refusal_messages=migrated_refusals,
-            refusal_message=migrated_refusals.get("en", DEFAULT_REFUSAL_MESSAGE),
             settings_history=hist[:MAX_SETTINGS_HISTORY_ENTRIES],
             created_at=str(data.get("created_at") or now),
             updated_at=str(data.get("updated_at") or now),
@@ -281,7 +246,7 @@ _PROFILE_CHANGE_SPECS: list[tuple[str, str, Any]] = [
     ("chunk_size", "Chunk Size", _fmt_arrow),
     ("chunk_overlap", "Chunk Overlap", _fmt_arrow),
     ("history_turns", "History Turns", _fmt_arrow),
-    ("refusal_message", "Refusal Message", _fmt_label_only),
+    ("refusal_messages", "Refusal messages", _fmt_label_only),
     ("enable_thinking", "Thinking Mode", _fmt_on_off),
     ("default_language", "Default Language", _fmt_arrow),
 ]
@@ -382,8 +347,8 @@ class ProfileManager:
         self,
         data_dir: Path,
         *,
-        default_chat_model: str = "qwen3.5:4b",
-        default_embedding_model: str = "nomic-embed-text",
+        default_chat_model: str = AppConfig.default_chat_model,
+        default_embedding_model: str = AppConfig.default_embedding_model,
     ) -> None:
         self.data_dir = Path(data_dir)
         self.profiles_dir = self.data_dir / "profiles"
@@ -511,7 +476,7 @@ class ProfileManager:
 
     def _write_profile(self, folder: Path, profile: Profile) -> None:
         target = folder / "profile.json"
-        _atomic_write_json(target, profile.to_dict())
+        atomic_write_json(target, profile.to_dict())
 
     # --- Document Manifest Helpers ---
 
@@ -520,7 +485,7 @@ class ProfileManager:
 
     def _write_documents(self, folder: Path, docs: list[DocumentRecord]) -> None:
         manifest = folder / "documents.json"
-        _atomic_write_json(manifest, [d.to_dict() for d in docs])
+        atomic_write_json(manifest, [d.to_dict() for d in docs])
 
     def list_documents(self, profile_id: str) -> list[DocumentRecord]:
         manifest = self._documents_manifest_path(profile_id)
@@ -677,7 +642,7 @@ class ProfileManager:
             created_at=existing_created,
             updated_at=now,
         )
-        _atomic_write_json(target, saved.to_dict())
+        atomic_write_json(target, saved.to_dict())
         return saved
 
     def delete_chat(self, profile_id: str, chat_id: str) -> None:

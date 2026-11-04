@@ -99,7 +99,6 @@ class DeterministicMockBackend(LLMBackend):
         self.pull_offline: bool = False
         self.next_chat_reply: str | None = None
         self.next_chat_stats: dict[str, Any] | None = None
-        self._last_chat_stats: dict[str, Any] | None = None
 
         self.chat_calls: list[dict[str, Any]] = []
         self.embed_calls: list[dict[str, Any]] = []
@@ -108,18 +107,6 @@ class DeterministicMockBackend(LLMBackend):
         if not self.reachable:
             raise BackendUnavailableError(self.base_url, details="Connection refused")
         return list(self.models)
-
-    def model_info(self, model: str) -> dict[str, Any]:
-        for m in self.list_models():
-            if m["name"] == model:
-                return m
-        return {
-            "name": model,
-            "size_bytes": 0,
-            "size_human": "Unknown size",
-            "capabilities": ["completion"],
-            "capabilities_verified": False,
-        }
 
     def embed(self, texts: list[str], model: str) -> list[list[float]]:
         if not self.reachable:
@@ -163,18 +150,19 @@ class DeterministicMockBackend(LLMBackend):
         messages: list[dict[str, str]],
         model: str,
         options: dict[str, Any] | None = None,
-        stream: bool = True,
+        stats: dict[str, Any] | None = None,
     ) -> Iterator[str]:
         if not self.reachable:
             raise BackendUnavailableError(self.base_url, details="Connection refused")
         if model in self.fail_load_models:
             raise ModelLoadError(model, details="llama_model_load: error loading model: not enough RAM")
 
-        self._last_chat_stats = self.next_chat_stats
+        if stats is not None and self.next_chat_stats is not None:
+            stats.update(self.next_chat_stats)
         self.next_chat_stats = None
 
         self.chat_calls.append(
-            {"model": model, "messages": messages, "options": options, "stream": stream}
+            {"model": model, "messages": messages, "options": options}
         )
 
         if model in self.fail_mid_stream_models:

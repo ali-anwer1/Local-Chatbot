@@ -5,13 +5,13 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 import json
-import threading
 from typing import Any
 import httpx
 
-from app.config import VALID_EMBEDDING_DEVICES, AppSettings
+from app.config import AppSettings
 from app.core.backends.base import (
     LLMBackend,
+    OLLAMA_CHAT_STAT_KEYS,
     format_bytes,
     infer_capabilities_from_name,
 )
@@ -54,12 +54,6 @@ NETWORK_ERROR_INDICATORS = (
 )
 
 EMBED_BATCH_SIZE = 32
-OLLAMA_CHAT_STAT_KEYS = (
-    "prompt_eval_count",
-    "prompt_eval_duration",
-    "eval_count",
-    "eval_duration",
-)
 
 
 class OllamaBackend(LLMBackend):
@@ -72,72 +66,22 @@ class OllamaBackend(LLMBackend):
         connect_timeout_seconds: float = 5.0,
         transport: httpx.BaseTransport | None = None,
         *,
-        embedding_device: str = "cpu",
-        keep_alive: str = "30m",
-        app_settings: AppSettings | None = None,
+        app_settings: AppSettings,
     ) -> None:
-        if embedding_device not in VALID_EMBEDDING_DEVICES:
-            raise ValueError(
-                f"Invalid embedding_device '{embedding_device}'. Must be 'cpu' or 'auto'."
-            )
         self.base_url = base_url.rstrip("/")
         self.timeout = httpx.Timeout(timeout_seconds, connect=connect_timeout_seconds)
         self._transport = transport
-        self._embedding_device = embedding_device
-        self._keep_alive = keep_alive
-        self._app_settings = app_settings
-        self._thread_local = threading.local()
-        self._last_chat_stats: dict[str, Any] | None = None
+        self.app_settings = app_settings
         # Cache /api/show metadata keyed by (model_name, digest) to avoid redundant calls
         self._show_cache: dict[tuple[str, str], dict[str, Any]] = {}
-        # Cache raw capabilities per model name so chat() knows if 'thinking' is present
-        self._raw_capabilities: dict[str, set[str]] = {}
-
-    def bind_app_settings(self, app_settings: AppSettings) -> None:
-        """Bind a shared mutable AppSettings holder so runtime setting changes take effect immediately."""
-        self._app_settings = app_settings
 
     @property
     def embedding_device(self) -> str:
-        if self._app_settings is not None:
-            return self._app_settings.embedding_device
-        return self._embedding_device
-
-    @embedding_device.setter
-    def embedding_device(self, value: str) -> None:
-        if value not in VALID_EMBEDDING_DEVICES:
-            raise ValueError(
-                f"Invalid embedding_device '{value}'. Must be 'cpu' or 'auto'."
-            )
-        self._embedding_device = value
-        if self._app_settings is not None:
-            self._app_settings.update({"embedding_device": value})
+        return self.app_settings.embedding_device
 
     @property
     def keep_alive(self) -> str:
-        if self._app_settings is not None:
-            return self._app_settings.keep_alive
-        return self._keep_alive
-
-    @keep_alive.setter
-    def keep_alive(self, value: str) -> None:
-        self._keep_alive = value
-
-    def _set_last_chat_stats(self, stats: dict[str, Any] | None) -> None:
-        self._thread_local.last_chat_stats = stats
-        self._last_chat_stats = stats
-
-    def _record_chat_stats(self, chunk: dict[str, Any]) -> None:
-        stats: dict[str, int] = {}
-        for key in OLLAMA_CHAT_STAT_KEYS:
-            val = chunk.get(key)
-            if isinstance(val, (int, float)) and not isinstance(val, bool):
-                stats[key] = int(val)
-        self._set_last_chat_stats(stats if stats else None)
-
-    def get_last_chat_stats(self) -> dict[str, Any] | None:
-        stats = getattr(self._thread_local, "last_chat_stats", self._last_chat_stats)
-        return dict(stats) if isinstance(stats, dict) else None
+        return self.app_settings.keep_alive
 
     def _client(self, timeout: httpx.Timeout | None = None) -> httpx.Client:
         return httpx.Client(
@@ -203,7 +147,7 @@ class OllamaBackend(LLMBackend):
 
     def _parse_capabilities(
         self, model_name: str, show_data: dict[str, Any]
-    ) -> tuple[list[str], bool, set[str]]:
+    ) -> tuple[list[str], bool]:
         raw_caps = show_data.get("capabilities")
         if isinstance(raw_caps, list) and len(raw_caps) > 0:
             raw_set = {str(c).lower() for c in raw_caps}
@@ -213,14 +157,11 @@ class OllamaBackend(LLMBackend):
             if "embedding" in raw_set:
                 normalized.append("embedding")
             if normalized:
-                self._raw_capabilities[model_name.lower()] = raw_set
-                return normalized, True, raw_set
+                return normalized, True
 
         # Fallback heuristic when Ollama version omits capabilities (§4.4)
         inferred = infer_capabilities_from_name(model_name)
-        raw_set = set(inferred)
-        self._raw_capabilities[model_name.lower()] = raw_set
-        return inferred, False, raw_set
+        return inferred, False
 
     def list_models(self) -> list[dict[str, Any]]:
         """List installed Ollama models with capabilities and size on disk."""
@@ -249,9 +190,7 @@ class OllamaBackend(LLMBackend):
                     if isinstance(show_data.get("details"), dict)
                     else {}
                 )
-                capabilities, verified, raw_caps = self._parse_capabilities(name, show_data)
-                if ":" in name and name.endswith(":latest"):
-                    self._raw_capabilities[name[:-7].lower()] = raw_caps
+                capabilities, verified = self._parse_capabilities(name, show_data)
 
                 param_size = (
                     details.get("parameter_size")
@@ -277,35 +216,6 @@ class OllamaBackend(LLMBackend):
                 )
             return results
 
-    def model_info(self, model: str) -> dict[str, Any]:
-        """Return size on disk, params, quantization, and capabilities for a model."""
-        installed = self.list_models()
-        for item in installed:
-            if item["name"].lower() == model.strip().lower() or (
-                ":" not in model and item["name"].lower() == f"{model.strip().lower()}:latest"
-            ):
-                return item
-
-        # Fallback directly to /api/show if tag wasn't matched directly
-        with self._translate_http_errors(), self._client() as client:
-            show_data = self._fetch_show_data(client, model)
-            capabilities, verified, _ = self._parse_capabilities(model, show_data)
-            details = (
-                show_data.get("details")
-                if isinstance(show_data.get("details"), dict)
-                else {}
-            )
-            size_bytes = int(show_data.get("size") or 0)
-            return {
-                "name": model,
-                "size_bytes": size_bytes,
-                "size_human": format_bytes(size_bytes),
-                "parameter_size": details.get("parameter_size"),
-                "quantization": details.get("quantization_level"),
-                "capabilities": capabilities,
-                "capabilities_verified": verified,
-            }
-
     def _build_runtime_options(self, options: dict[str, Any] | None) -> dict[str, Any]:
         if not options:
             return {}
@@ -320,15 +230,14 @@ class OllamaBackend(LLMBackend):
         messages: list[dict[str, str]],
         model: str,
         options: dict[str, Any] | None = None,
-        stream: bool = True,
+        stats: dict[str, Any] | None = None,
     ) -> Iterator[str]:
         """Call Ollama /api/chat and yield response text tokens."""
-        self._set_last_chat_stats(None)
         runtime_options = self._build_runtime_options(options)
         payload: dict[str, Any] = {
             "model": model,
             "messages": messages,
-            "stream": stream,
+            "stream": True,
             "keep_alive": self.keep_alive,
         }
         if runtime_options:
@@ -337,16 +246,13 @@ class OllamaBackend(LLMBackend):
         # Disable extended chain-of-thought delay by default (think=False) across all
         # thinking-capable models (e.g. qwen3.5:4b, qwen3, deepseek-r1) unless the user
         # explicitly enabled thinking mode. Legacy models that reject 'think' with HTTP 400
-        # automatically retry without the parameter in _stream_chat / _non_stream_chat.
+        # automatically retry without the parameter in _stream_chat.
         if options and "think" in options:
             payload["think"] = bool(options["think"])
         else:
             payload["think"] = False
 
-        if stream:
-            yield from self._stream_chat(payload, model)
-        else:
-            yield from self._non_stream_chat(payload, model)
+        yield from self._stream_chat(payload, model, stats=stats)
 
     def _classify_chat_error(self, model: str, status_code: int, err_msg: str) -> ChatbotError:
         lowered = err_msg.lower()
@@ -354,33 +260,19 @@ class OllamaBackend(LLMBackend):
             return ChatModelMissingError(model, details=err_msg)
         return ModelLoadError(model, details=err_msg)
 
-    def _non_stream_chat(self, payload: dict[str, Any], model: str) -> Iterator[str]:
-        with self._translate_http_errors(model=model), self._client() as client:
-            resp = client.post("/api/chat", json=payload)
-            if resp.status_code == 400 and "think" in payload:
-                retry_payload = {k: v for k, v in payload.items() if k != "think"}
-                resp = client.post("/api/chat", json=retry_payload)
-            if resp.status_code >= 400:
-                err = self._extract_error_message(resp)
-                raise self._classify_chat_error(model, resp.status_code, err)
-            data = resp.json()
-            if isinstance(data, dict) and data.get("error"):
-                raise self._classify_chat_error(model, 500, str(data["error"]))
-            if isinstance(data, dict):
-                self._record_chat_stats(data)
-            msg = data.get("message", {}) if isinstance(data, dict) else {}
-            content = str(msg.get("content") or "")
-            if content:
-                yield content
-
-    def _stream_chat(self, payload: dict[str, Any], model: str) -> Iterator[str]:
+    def _stream_chat(
+        self,
+        payload: dict[str, Any],
+        model: str,
+        stats: dict[str, Any] | None = None,
+    ) -> Iterator[str]:
         with self._translate_http_errors(model=model), self._client() as client:
             with client.stream("POST", "/api/chat", json=payload) as resp:
                 if resp.status_code == 400 and "think" in payload:
                     # Consume and retry without 'think' parameter
                     resp.read()
                     retry_payload = {k: v for k, v in payload.items() if k != "think"}
-                    yield from self._stream_chat(retry_payload, model)
+                    yield from self._stream_chat(retry_payload, model, stats=stats)
                     return
 
                 if resp.status_code >= 400:
@@ -400,8 +292,11 @@ class OllamaBackend(LLMBackend):
                     if chunk.get("error"):
                         raise self._classify_chat_error(model, 500, str(chunk["error"]))
                     is_done = bool(chunk.get("done"))
-                    if is_done:
-                        self._record_chat_stats(chunk)
+                    if is_done and stats is not None:
+                        for key in OLLAMA_CHAT_STAT_KEYS:
+                            val = chunk.get(key)
+                            if isinstance(val, (int, float)) and not isinstance(val, bool):
+                                stats[key] = int(val)
                     msg = chunk.get("message")
                     if isinstance(msg, dict):
                         token = msg.get("content")

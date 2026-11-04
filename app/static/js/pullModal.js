@@ -105,7 +105,7 @@ export async function executeModelPull() {
   }
 }
 
-export function showPullError(message, details) {
+function showPullError(message, details) {
   el.pullStepProgress.hidden = true;
   el.pullErrorMsg.textContent = message;
   if (details) {

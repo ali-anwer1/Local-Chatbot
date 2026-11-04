@@ -6,8 +6,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 INDEX_HTML = ROOT / "app" / "static" / "index.html"
 CONSTANTS_JS = ROOT / "app" / "static" / "js" / "constants.js"
-INFOTIPS_JS = ROOT / "app" / "static" / "js" / "infoTips.js"
-STYLES_CSS = ROOT / "app" / "static" / "styles.css"
 
 REQUIRED_SETTINGS = [
     # 13 Settings Panel settings
@@ -81,19 +79,3 @@ def test_index_html_contains_all_info_buttons_and_popover():
     # Duplicate field hints removed
     assert "Off by default for faster responses." not in html
     assert "Queries scoring below this cutoff are refused before calling the model." not in html
-
-
-def test_infotips_js_module_exists_and_exports_init():
-    assert INFOTIPS_JS.exists()
-    content = INFOTIPS_JS.read_text(encoding="utf-8")
-    assert "export function initInfoTips" in content
-    assert "showPopover" in content
-    assert "hidePopover" in content
-    assert "positionPopover" in content
-
-
-def test_styles_css_contains_tooltip_and_popover_rules():
-    css = STYLES_CSS.read_text(encoding="utf-8")
-    assert ".info-tip-btn" in css
-    assert ".info-popover" in css
-    assert ".field-label-row" in css

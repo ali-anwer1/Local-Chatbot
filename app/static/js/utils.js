@@ -4,7 +4,7 @@ import { KNOWN_MODEL_SIZE_ESTIMATES, SVG_ICONS } from "./constants.js";
 import { el } from "./dom.js";
 import { state } from "./state.js";
 
-export function normalizeTag(tag) {
+function normalizeTag(tag) {
   if (!tag) return "";
   const trimmed = tag.trim().toLowerCase();
   return trimmed.includes(":") ? trimmed : `${trimmed}:latest`;

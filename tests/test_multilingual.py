@@ -303,3 +303,26 @@ def test_model_refusal_check_matches_non_english_refusal(
     assert resp.refused is True
     assert resp.target_language == "ms"
     assert ms_refusal in resp.answer
+
+
+def test_explicit_language_request_patterns_positive_and_negative():
+    """1d: Explicit language request regexes require answer/reply verbs and reject mentions."""
+    # Positive: explicit command to answer/reply in that language
+    assert detect_explicit_language_request("Please answer in English.") == "en"
+    assert detect_explicit_language_request("Write in English please.") == "en"
+    assert detect_explicit_language_request("Tolong jawab dalam bahasa Melayu.") == "ms"
+    assert detect_explicit_language_request("Sila balas dalam bahasa Malaysia.") == "ms"
+    assert detect_explicit_language_request("请用中文回答我") == "zh"
+    assert detect_explicit_language_request("请用简体中文回复") == "zh"
+    assert detect_explicit_language_request("Tolong jawab dalam bahasa Indonesia.") == "id"
+    assert detect_explicit_language_request("日本語で答えてください") == "ja"
+    assert detect_explicit_language_request("한국어로 대답해주세요") == "ko"
+    assert detect_explicit_language_request("أجب باللغة العربية") == "ar"
+
+    # Negative: mentions of languages without answer/reply verbs must NOT force the language
+    assert detect_explicit_language_request("Is the manual available in 中文?") is None
+    assert detect_explicit_language_request("Adakah manual ini ada dalam bahasa Melayu?") is None
+    assert detect_explicit_language_request("Apakah dokumen tersedia dalam bahasa Indonesia?") is None
+    assert detect_explicit_language_request("Do you have documentation in 日本語?") is None
+    assert detect_explicit_language_request("Can you use english as a search query?") is None
+    assert detect_explicit_language_request("Does this system support Korean or 한국어?") is None
