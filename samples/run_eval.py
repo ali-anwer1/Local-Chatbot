@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 from typing import Any
@@ -179,7 +180,11 @@ def run_evaluation(
     else:
         files_to_run = [DEFAULT_QUESTIONS_PATH]
 
-    with tempfile.TemporaryDirectory(prefix="local_rag_eval_") as tmp_dir:
+    # Delete leftovers from earlier runs (Windows can't delete them while Chroma has them open)
+    for stale in Path(tempfile.gettempdir()).glob("local_rag_eval_*"):
+        shutil.rmtree(stale, ignore_errors=True)
+
+    with tempfile.TemporaryDirectory(prefix="local_rag_eval_", ignore_cleanup_errors=True) as tmp_dir:
         eval_cfg = AppConfig(
             host="127.0.0.1",
             port=base_cfg.port,
