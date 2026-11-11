@@ -8,7 +8,7 @@
 
 A chatbot that runs entirely on a local laptop and answers questions **only from a user-supplied knowledge base**. It is topic-agnostic. Each "bot profile" pairs a user-written preamble (system prompt) with its own set of documents, so the same app can act as a product-spec assistant, a training-material Q&A, or anything else.
 
-- **Primary use:** internal office tool. The first milestone is a working demo to present to a manager.
+- **Primary use:** a general-purpose tool for asking questions about a document collection, such as product specs or procedures. The first milestone is a working demo.
 - **Later use:** cleaned up and published as a GitHub portfolio project.
 - **Hard requirement:** works offline after initial setup. No document content, prompts, or answers leave the machine.
 
@@ -148,7 +148,7 @@ Also needed: a clear-conversation button, and a status indicator showing whether
 Conversation history is held in memory per browser session for Phase 1. Persistence is not required.
 
 ### 4.7 Model availability and fallbacks
-Profiles can reference models that aren't installed: a model was deleted, a profile was copied to a colleague's laptop, or Ollama was reinstalled. The app must detect this and never fail with a raw backend error.
+Profiles can reference models that aren't installed: a model was deleted, a profile was copied to another laptop, or Ollama was reinstalled. The app must detect this and never fail with a raw backend error.
 
 **When checks run:** at startup, when a profile is opened, before each chat request (using a cached model list, refreshed at most every 30 seconds), and before ingestion.
 
@@ -202,7 +202,7 @@ local-rag-chatbot/
 - **Python** 3.11+, FastAPI, Uvicorn, `httpx`, ChromaDB (persistent client with `anonymized_telemetry=False`), `pypdf`, `python-docx`, `pytest`
 - **Server binds to `127.0.0.1` only.** It must never be reachable from the network.
 - **Baseline hardware:** HP EliteBook, AMD Ryzen 7 8840U, Radeon 780M iGPU, 16 GB RAM. A Qwen 4B model runs on the iGPU; 9B runs on CPU only. Default the chat model to the installed Qwen 4B, configurable.
-- **Target deployment:** colleagues' laptops are 1–2 CPU generations older with at least 16 GB RAM and iGPUs. Keep the default footprint modest.
+- **Target deployment:** laptops 1–2 CPU generations older than the development machine, with at least 16 GB RAM and iGPUs. Keep the default footprint modest.
 - **OS:** assume Windows 11 as primary, but avoid OS-specific code so it also runs on Linux.
 - **Setup:** documented in the README in under 10 steps: install Ollama, pull models, create a venv, `pip install`, run.
 
@@ -249,5 +249,5 @@ A device profile has these fields:
 - Persisting conversation history across sessions
 - Whether to add LLM-based query rewriting if the simple follow-up handling (§4.3 step 1) proves inadequate
 - Re-ranking retrieved chunks if retrieval quality is weak
-- Packaging for colleagues (installer vs. README setup)
+- Packaging for other users (installer vs. README setup)
 - Default `similarity_threshold`: 0.5 is a placeholder and must be calibrated against the sample eval set

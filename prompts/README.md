@@ -1,5 +1,7 @@
 # Project Prompts & Implementation History
 
+[← README](../README.md) · [Docs](../docs/README.md)
+
 This directory archives all prompt specifications and instructions executed in chronological order:
 
 | Order | Prompt File | Scope & Purpose |
